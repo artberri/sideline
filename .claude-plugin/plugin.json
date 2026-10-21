@@ -21,6 +21,13 @@
 			"title": "Background",
 			"description": "Paint the pane with your terminal's background, as #hex (e.g. #1e2030), since Claude Code draws docked panes on its own grey. Empty keeps Claude Code's.",
 			"default": ""
+		},
+		"transcriptDiffs": {
+			"type": "string",
+			"title": "Diffs in the conversation",
+			"description": "hide: an edit shows one summary line (Updated path (+N -M)) and its diff is in the pane; show: the conversation shows the diffs as Claude Code draws them. ctrl+o always shows them.",
+			"default": "hide",
+			"options": ["hide", "show"]
 		}
 	}
 }

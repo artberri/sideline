@@ -6,6 +6,7 @@ import { readSnapshot } from './git'
 import { rowIcon } from './icons'
 import { drawRows } from './rows'
 import type { RowSpec } from './rows'
+import { countsLabel, summarize } from './summary'
 import { BRANCH_ICON, backgroundOption, resolveGlyphs, statusSymbols } from './symbols'
 import { treeRows } from './tree'
 
@@ -14,6 +15,8 @@ const TITLE = 'Changes'
 const POLL_MS = 2_000
 const REFRESH_AFTER = new Set(['Edit', 'Write', 'NotebookEdit', 'Bash'])
 const FLASH_MS = 1_500
+// Claude Code's own result gutter, which a row drawn in place of a ToolResult does not get.
+const RESULT_GUTTER = '  ⎿  '
 
 const snapshot = atom({ plugin: 'vacuo', key: 'snapshot' } as const, { kind: 'loading' } as Snapshot)
 const glyphs = atom({ plugin: 'vacuo', key: 'glyphs' } as const, 'plain')
@@ -78,6 +81,7 @@ function withEditedFiles(files: ChangedFile[], edited: Map<string, ActiveEdit>):
 
 export const register: Register = (on, options) => {
 	const background = backgroundOption(options.background)
+	const isHidingDiffs = options.transcriptDiffs !== 'show'
 
 	on('session.start', async ($, e, next) => {
 		await $.command.register({ name: 'vacuo', description: 'Show the changed-files pane' })
@@ -113,6 +117,27 @@ export const register: Register = (on, options) => {
 		}
 		void refresh($)
 		return result
+	})
+
+	on('ui.render', { component: 'ToolResult' }, async ($, e, next) => {
+		if (!isHidingDiffs || e.props.isExpanded === true || e.props.isErrored) return next(e)
+		const summaries = summarize(e.props.tool, e.props.output, await $.session.cwd())
+		if (!summaries) return next(e)
+		const { Box, Text } = $.ui.resolve(e)
+		return (
+			<Box flexDirection="column">
+				{summaries.map((summary) => (
+					<Box key={summary.path}>
+						<Text>
+							<Text dimColor>{RESULT_GUTTER}</Text>
+							{`${summary.verb} `}
+							<Text bold>{summary.path}</Text>
+							<Text dimColor>{` ${countsLabel(summary)}`}</Text>
+						</Text>
+					</Box>
+				))}
+			</Box>
+		)
 	})
 
 	on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
