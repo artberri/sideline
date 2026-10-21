@@ -14,6 +14,12 @@
 			"description": "auto uses Nerd Font icons when a Nerd Font is installed; nerd or plain forces one set",
 			"default": "auto",
 			"options": ["auto", "nerd", "plain"]
+		},
+		"background": {
+			"type": "string",
+			"title": "Background",
+			"description": "Paint the pane with your terminal's background, as #hex (e.g. #1e2030), since Claude Code draws docked panes on its own grey. Empty keeps Claude Code's.",
+			"default": ""
 		}
 	}
 }

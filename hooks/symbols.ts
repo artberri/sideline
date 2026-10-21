@@ -34,3 +34,9 @@ export async function resolveGlyphs($: EngineInterface, option: unknown): Promis
 		return 'plain'
 	}
 }
+
+const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i
+
+export function backgroundOption(option: unknown): string | undefined {
+	return typeof option === 'string' && HEX_COLOR.test(option.trim()) ? option.trim() : undefined
+}

@@ -3,7 +3,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Header } from '../types'
 import { readHeader } from './git'
-import { BRANCH_ICON, resolveGlyphs, statusSymbols } from './symbols'
+import { BRANCH_ICON, backgroundOption, resolveGlyphs, statusSymbols } from './symbols'
 
 const PANE = 'vacuo'
 const TITLE = 'Changes'
@@ -19,6 +19,8 @@ async function refresh($: EngineInterface): Promise<void> {
 }
 
 export const register: Register = (on, options) => {
+	const background = backgroundOption(options.background)
+
 	on('session.start', async ($, e, next) => {
 		await $.command.register({ name: 'vacuo', description: 'Show the changed-files pane' })
 		const resolved = await resolveGlyphs($, options.glyphs)
@@ -39,16 +41,24 @@ export const register: Register = (on, options) => {
 		const { Box, Text } = $.ui.resolve(e)
 		const shown = await read($, header)
 		const icon = BRANCH_ICON[await read($, glyphs)]
-		if (shown.kind === 'loading') return <Box />
-		if (shown.kind === 'none') return <Text dimColor>not a git repo</Text>
-		const symbols = statusSymbols(shown.status)
-		return (
-			<Box flexDirection="column">
-				<Text>
-					<Text color="magenta" bold>{`${icon} ${shown.branch}`}</Text>
-					{symbols && <Text color="red" bold>{` [${symbols}]`}</Text>}
-				</Text>
+		const fill = (body: JSX.Element) => (
+			<Box
+				flexDirection="column"
+				backgroundColor={background}
+				width={e.props.bodyColumns}
+				minHeight={e.props.scroll.bodyRows}
+			>
+				{body}
 			</Box>
+		)
+		if (shown.kind === 'loading') return fill(<Text> </Text>)
+		if (shown.kind === 'none') return fill(<Text dimColor>not a git repo</Text>)
+		const symbols = statusSymbols(shown.status)
+		return fill(
+			<Text>
+				<Text color="magenta" bold>{`${icon} ${shown.branch}`}</Text>
+				{symbols && <Text color="red" bold>{` [${symbols}]`}</Text>}
+			</Text>,
 		)
 	})
 }

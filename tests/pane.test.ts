@@ -103,3 +103,19 @@ test('glyphs: nerd forces the Nerd Font icon', { options: { glyphs: 'nerd' } }, 
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	expect(await drawn($, 'terminal')).toContain('\u{e0a0} main')
 })
+
+test('background paints the pane with the given color', { options: { background: '#1e2030' } }, async ($, on) => {
+	world(on, { status: STATUS }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	expect(await drawn($, 'terminal')).toContain('"backgroundColor":"#1e2030"')
+})
+
+test(
+	'an empty or invalid background leaves the pane to Claude Code',
+	{ options: { background: 'navy' } },
+	async ($, on) => {
+		world(on, { status: STATUS }, [])
+		await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+		expect(await drawn($, 'terminal')).not.toContain('backgroundColor')
+	},
+)
