@@ -14,9 +14,9 @@ export type RowSpec = {
 	isBinary: boolean
 }
 
-export type RowsProps = { rows: RowSpec[] }
+export type RowsProps = { rows: RowSpec[]; hoverBackground: string | null }
 
-type Local = { phase: number; stop?: () => void }
+type Local = { phase: number; hovered: number; stop?: () => void }
 
 const TICK_MS = 90
 const BAND = 3
@@ -27,7 +27,13 @@ function isInBand(index: number, phase: number, length: number): boolean {
 	return Math.abs(index - position) < BAND / 2 + 0.5
 }
 
-export function drawRows(rows: RowSpec[], { Box, Text }: Pick<ClientElements, 'Box' | 'Text'>, phase: number) {
+export function drawRows(
+	{ rows, hoverBackground }: RowsProps,
+	{ Box, Text }: Pick<ClientElements, 'Box' | 'Text'>,
+	phase: number,
+	hovered = -1,
+) {
+	const isHovered = (row: RowSpec) => row.kind === 'file' && rows[hovered]?.id === row.id
 	const name = (row: RowSpec) => {
 		if (row.lit === 'done') {
 			return (
@@ -54,13 +60,21 @@ export function drawRows(rows: RowSpec[], { Box, Text }: Pick<ClientElements, 'B
 				</Text>
 			)
 		}
-		return <Text strikethrough={row.isStruck}>{row.name}</Text>
+		return (
+			<Text strikethrough={row.isStruck} underline={isHovered(row)}>
+				{row.name}
+			</Text>
+		)
 	}
 
 	return (
 		<Box flexDirection="column">
 			{rows.map((row) => (
-				<Box key={row.id} flexDirection="row">
+				<Box
+					key={row.id}
+					flexDirection="row"
+					backgroundColor={isHovered(row) && hoverBackground ? hoverBackground : undefined}
+				>
 					<Box flexGrow={1} flexShrink={1} overflow="hidden">
 						<Text wrap="truncate-end">
 							{row.indent}
@@ -86,7 +100,7 @@ export function drawRows(rows: RowSpec[], { Box, Text }: Pick<ClientElements, 'B
 
 // The animated rows: a Client owns the frame timer, so the shimmer never makes the pane's hook redraw.
 export const Rows: ClientModule<RowsProps, Local> = (props, surface) => {
-	const state = surface.state ?? { phase: 0 }
+	const state = surface.state ?? { phase: 0, hovered: -1 }
 	const isRunning = props.rows.some((row) => row.lit === 'running')
 	if (isRunning && !state.stop) {
 		const stop = surface.every(TICK_MS, () => {
@@ -96,12 +110,15 @@ export const Rows: ClientModule<RowsProps, Local> = (props, surface) => {
 		surface.setState({ ...state, stop })
 	} else if (!isRunning && state.stop) {
 		state.stop()
-		surface.setState({ phase: 0 })
+		surface.setState({ phase: 0, hovered: state.hovered })
 	}
 	surface.onPointer((event) => {
+		const current = surface.state ?? state
+		const hovered = event.type === 'leave' || !props.rows[event.y] ? -1 : event.y
+		if (hovered !== current.hovered) surface.setState({ ...current, hovered })
 		if (event.type !== 'down' || (event.button ?? 'left') !== 'left') return
 		const row = props.rows[event.y]
 		if (row) surface.post({ press: row.id, kind: row.kind })
 	})
-	return drawRows(props.rows, surface.elements, state.phase)
+	return drawRows(props, surface.elements, state.phase, state.hovered)
 }

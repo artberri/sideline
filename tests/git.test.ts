@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { parseNumstat, parseStatus } from '../hooks/git'
-import { statusSymbols } from '../hooks/symbols'
+import { lighten, statusSymbols } from '../hooks/symbols'
 
 const NUL = '\0'
 
@@ -104,4 +104,9 @@ test('parseNumstat reads counts, renames, binaries and --no-index output', () =>
 	expect(counts.get('new.ts')).toEqual({ added: 0, deleted: 0, isBinary: false })
 	expect(counts.has('old.ts')).toBe(false)
 	expect(counts.get('fresh.ts')).toEqual({ added: 3, deleted: 0, isBinary: false })
+})
+
+test('lighten mixes a little white into a background color', () => {
+	expect(lighten('#1e1e3f')).toBe('#393956')
+	expect(lighten('#000')).toBe('#1f1f1f')
 })

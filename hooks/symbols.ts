@@ -40,3 +40,22 @@ const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i
 export function backgroundOption(option: unknown): string | undefined {
 	return typeof option === 'string' && HEX_COLOR.test(option.trim()) ? option.trim() : undefined
 }
+
+// A hovered row's background: the pane's own background with a little white mixed in.
+export function lighten(hex: string, amount = 0.12): string {
+	const full =
+		hex.length === 4
+			? `#${hex
+					.slice(1)
+					.split('')
+					.map((c) => c + c)
+					.join('')}`
+			: hex
+	const channel = (i: number) => {
+		const value = Number.parseInt(full.slice(i, i + 2), 16)
+		return Math.round(value + (255 - value) * amount)
+			.toString(16)
+			.padStart(2, '0')
+	}
+	return `#${channel(1)}${channel(3)}${channel(5)}`
+}

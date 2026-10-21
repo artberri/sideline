@@ -7,7 +7,7 @@ import { rowIcon } from './icons'
 import { drawRows } from './rows'
 import type { RowSpec } from './rows'
 import { countsLabel, summarize } from './summary'
-import { BRANCH_ICON, backgroundOption, resolveGlyphs, statusSymbols } from './symbols'
+import { BRANCH_ICON, backgroundOption, lighten, resolveGlyphs, statusSymbols } from './symbols'
 import { treeRows } from './tree'
 
 const PANE = 'vacuo'
@@ -103,6 +103,7 @@ function withEditedFiles(files: ChangedFile[], edited: Map<string, ActiveEdit>):
 
 export const register: Register = (on, options) => {
 	const background = backgroundOption(options.background)
+	const hoverBackground = background ? lighten(background) : null
 	const isHidingDiffs = options.transcriptDiffs !== 'show'
 
 	on('session.start', async ($, e, next) => {
@@ -245,9 +246,9 @@ export const register: Register = (on, options) => {
 						{rows.length === 0 ? (
 							<Text dimColor>no changes</Text>
 						) : 'Client' in elements ? (
-							<elements.Client key="rows" module="./rows.tsx" props={{ rows }} />
+							<elements.Client key="rows" module="./rows.tsx" props={{ rows, hoverBackground }} />
 						) : (
-							drawRows(rows, elements, 0)
+							drawRows({ rows, hoverBackground }, elements, 0)
 						)}
 					</Box>
 				)}

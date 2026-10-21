@@ -339,3 +339,26 @@ test('the open diff follows the file and closes once it is no longer changed', a
 	expect(await ui.find({ type: 'Code' })).toBeUndefined()
 	await ui.unmount()
 })
+
+test(
+	'a file row lights up and underlines its name on hover; a folder does not',
+	{ options: { background: '#1e1e3f' } },
+	async ($, on) => {
+		world(on, { status: NESTED, numstat: NESTED_NUMSTAT }, [])
+		await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+		const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+		const hoverRow = async (y: number) => {
+			await ui.pointer({ type: 'move', x: 2, y, in: 'rows' })
+			return ui.findAll({ type: 'Box', in: 'rows' })
+		}
+		// Rows: .ai/plans/, plan.md, src/, fresh.ts, gone.ts, ...
+		const overFile = await hoverRow(4)
+		expect(overFile.find((box) => box.key === 'src/gone.ts')?.props).toMatchObject({ backgroundColor: '#393956' })
+		expect((await ui.find({ type: 'Text', text: /^gone\.ts$/, in: 'rows' }))?.props).toMatchObject({
+			underline: true,
+		})
+		const overFolder = await hoverRow(2)
+		expect(overFolder.some((box) => box.props.backgroundColor === '#393956')).toBe(false)
+		await ui.unmount()
+	},
+)
