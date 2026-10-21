@@ -45,8 +45,8 @@ export const register: Register = (on, options) => {
 		return (
 			<Box flexDirection="column">
 				<Text>
-					<Text color="#c084fc" bold>{`${icon} ${shown.branch}`}</Text>
-					{symbols && <Text color="#f87171" bold>{` [${symbols}]`}</Text>}
+					<Text color="magenta" bold>{`${icon} ${shown.branch}`}</Text>
+					{symbols && <Text color="red" bold>{` [${symbols}]`}</Text>}
 				</Text>
 			</Box>
 		)

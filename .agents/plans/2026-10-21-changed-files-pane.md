@@ -41,6 +41,9 @@ runs. A smaller, focused take on [claude-code-filetree](https://github.com/data-
 - **Nerd Font glyphs with plain fallbacks.** A `glyphs` `userConfig` option (`auto` default, `nerd`, `plain`). `auto`
   runs a light check: `fc-list ':charset=e0a0'`, then `~/Library/Fonts/*Nerd*` and `/Library/Fonts/*Nerd*`. This is
   the first half of filetree's `FONT_SCRIPT`, without its stale-terminal check.
+- **Colors follow the user's terminal and theme:** ANSI names (`magenta`, `red`) or Claude Code theme keys
+  (`success`, `warning`, `error`, `diffAdded`, `diffRemoved`), never hex, so the pane uses the person's own palette.
+  The pane's background is drawn by Claude Code and can't be set by the mod.
 - **Left out on purpose** (each can become its own plan): search, file preview, opening files, read highlights,
   git-action animations, themes and palettes, mouse and keyboard navigation, size/date columns.
 
