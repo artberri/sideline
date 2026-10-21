@@ -1,5 +1,6 @@
 import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
+import { cutDiff } from '../hooks/rows'
 import type { Engine } from 'claude-code/testing'
 
 type World = {
@@ -307,13 +308,13 @@ async function openFile($: Engine, path: string, kind: 'file' | 'dir' = 'file') 
 	return ui
 }
 
-test('clicking a file opens its diff against HEAD, without git headers', async ($, on) => {
+test('clicking a file opens its diff inside the rows Client, without git headers', async ($, on) => {
 	world(on, { status: STATUS, diffs: { 'modified.ts': MODIFIED_DIFF } }, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	const ui = await openFile($, 'modified.ts')
-	const code = await ui.find({ type: 'Code' })
+	const code = await ui.find({ type: 'Code', in: 'rows' })
 	expect(code?.props).toMatchObject({ source: '@@ -1 +1 @@\n-old\n+new\n', format: 'diff', path: 'modified.ts' })
-	expect(await ui.find({ type: 'Button', key: 'back' })).toBeDefined()
+	expect(await ui.find({ type: 'Button', key: 'back', in: 'rows' })).toBeDefined()
 	await ui.unmount()
 })
 
@@ -321,7 +322,7 @@ test('clicking a folder does nothing', async ($, on) => {
 	world(on, { status: NESTED, numstat: NESTED_NUMSTAT }, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	const ui = await openFile($, 'src/', 'dir')
-	expect(await ui.find({ type: 'Code' })).toBeUndefined()
+	expect(await ui.find({ type: 'Code', in: 'rows' })).toBeUndefined()
 	await ui.unmount()
 })
 
@@ -330,7 +331,7 @@ test('an untracked file shows its diff against /dev/null', async ($, on) => {
 	world(on, { status: STATUS, diffs: { 'fresh.ts': '@@ -0,0 +1 @@\n+hello\n' }, ran }, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	const ui = await openFile($, 'fresh.ts')
-	expect((await ui.find({ type: 'Code' }))?.props).toMatchObject({ source: '@@ -0,0 +1 @@\n+hello\n' })
+	expect((await ui.find({ type: 'Code', in: 'rows' }))?.props).toMatchObject({ source: '@@ -0,0 +1 @@\n+hello\n' })
 	expect(
 		ran.some((argv) => argv.includes('--no-index') && !argv.includes('--numstat') && argv.at(-1) === 'fresh.ts'),
 	).toBe(true)
@@ -342,7 +343,7 @@ test('the back button returns to the tree', async ($, on) => {
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	const ui = await openFile($, 'modified.ts')
 	await ui.press({ key: 'back' })
-	expect(await ui.find({ type: 'Code' })).toBeUndefined()
+	expect(await ui.find({ type: 'Code', in: 'rows' })).toBeUndefined()
 	await ui.unmount()
 	expect(await drawn($, 'terminal')).toContain('modified.ts')
 })
@@ -354,10 +355,12 @@ test('the open diff follows the file and closes once it is no longer changed', a
 	const ui = await openFile($, 'modified.ts')
 	w.diffs = { 'modified.ts': '@@ -1 +1,2 @@\n-old\n+new\n+more\n' }
 	await clock.advance(2_100)
-	expect((await ui.find({ type: 'Code' }))?.props).toMatchObject({ source: '@@ -1 +1,2 @@\n-old\n+new\n+more\n' })
+	expect((await ui.find({ type: 'Code', in: 'rows' }))?.props).toMatchObject({
+		source: '@@ -1 +1,2 @@\n-old\n+new\n+more\n',
+	})
 	w.status = STATUS.replace('1 .M N... 100644 100644 100644 a a modified.ts\0', '')
 	await clock.advance(2_100)
-	expect(await ui.find({ type: 'Code' })).toBeUndefined()
+	expect(await ui.find({ type: 'Code', in: 'rows' })).toBeUndefined()
 	await ui.unmount()
 })
 
@@ -383,3 +386,25 @@ test(
 		await ui.unmount()
 	},
 )
+
+const hunk = (n: number) => `@@ -${n} +${n} @@\n-${'a'.repeat(30)}\n+${'b'.repeat(30)}\n`
+
+test('the diff is cut to fit a Client and says so', () => {
+	const big = Array.from({ length: 10 }, (_, i) => hunk(i + 1)).join('')
+	const { hunks, isTruncated } = cutDiff(big, 200)
+	expect(isTruncated).toBe(true)
+	expect(hunks.length).toBeLessThanOrEqual(200)
+	expect(hunks.startsWith('@@ -1 +1 @@')).toBe(true)
+	expect(hunks.endsWith('\n')).toBe(true)
+	expect(hunks.endsWith(`+${'b'.repeat(30)}\n`)).toBe(true)
+	expect(cutDiff('@@ -1 +1 @@\n-a\n+b\n')).toEqual({ hunks: '@@ -1 +1 @@\n-a\n+b\n', isTruncated: false })
+})
+
+test('a truncated diff ends with a note', async ($, on) => {
+	const huge = `@@ -1 +1 @@\n-old\n+new\n${`@@ -2 +2 @@\n+${'x'.repeat(70)}\n`.repeat(1_000)}`
+	world(on, { status: STATUS, diffs: { 'modified.ts': huge } }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await openFile($, 'modified.ts')
+	expect((await ui.find({ type: 'Text', text: /diff truncated/, in: 'rows' }))?.text).toBe('… diff truncated')
+	await ui.unmount()
+})

@@ -20,7 +20,7 @@ jump between changed files from the diff, with a legend that tells the user how.
   the keyboard (ctrl+x tab) or with a click, the keys that apply in the current view, and `esc` back to the prompt. It
   is hidden when there are no changes. — _proved by:_
 - **K8.** Clicking a file keeps the keyboard in the pane: the diff opens in the same place, so the keys keep working.
-  — _proved by:_
+  — _proved by:_ `tests/pane.test.ts` › clicking a file opens its diff inside the rows Client, without git headers (focus: manual)
 
 ## Context
 
@@ -72,18 +72,18 @@ a diff keeps the keyboard in the pane. It looks the same.
 
 **Test Checklist:**
 
-- [ ] Pane test (K8): after a posted press on a file, the `Client` stays mounted and draws the diff (`Code` in `rows`).
-- [ ] Pane test: `← files` inside the `Client` goes back to the tree.
-- [ ] Unit test: a diff over the limit is cut and ends with `… diff truncated`.
+- [x] Pane test (K8): after a posted press on a file, the `Client` stays mounted and draws the diff (`Code` in `rows`).
+- [x] Pane test: `← files` inside the `Client` goes back to the tree.
+- [x] Unit test: a diff over the limit is cut and ends with `… diff truncated`.
 - [ ] Manual, live session (K8): click a file, then press a key; the pane still has the focus. The kit can't show
       focus.
 
 **To-do:**
 
-- [ ] Pass the open diff to the `Client` as props (`diff: { path, hunks } | null`), cut to the limit.
-- [ ] Draw the diff view in `hooks/rows.tsx` (`drawRows` and the static fallback), with `← files` posting `back`.
-- [ ] Handle `{ back: true }` in the `ui.message` hook; drop the pane-level diff view.
-- [ ] Run `bun run format` and `bun run check`.
+- [x] Pass the open diff to the `Client` as props (`diff: { path, hunks } | null`), cut to the limit.
+- [x] Draw the diff view in `hooks/rows.tsx` (`drawRows` and the static fallback), with `← files` posting `back`.
+- [x] Handle `{ back: true }` in the `ui.message` hook; drop the pane-level diff view.
+- [x] Run `bun run format` and `bun run check`.
 
 ## Phase 2: Move a selection and open diffs from the keyboard
 
@@ -130,4 +130,4 @@ keys.
 
 ## Next step
 
-Phase 1: pass the open diff to the rows `Client` and draw the diff view inside it.
+Phase 1: click a file in a live session and press a key; the pane should keep the focus (the manual test), then mark the phase ✅.

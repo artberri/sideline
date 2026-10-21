@@ -14,7 +14,10 @@ export type RowSpec = {
 	isBinary: boolean
 }
 
-export type RowsProps = { rows: RowSpec[]; hoverBackground: string | null }
+// The open file's diff as the rows Client draws it, cut to fit a Client's props.
+export type DiffView = { path: string; hunks: string; isTruncated: boolean }
+
+export type RowsProps = { rows: RowSpec[]; hoverBackground: string | null; diff: DiffView | null }
 
 type Local = { phase: number; hovered: number; stop?: () => void }
 
@@ -27,8 +30,41 @@ function isInBand(index: number, phase: number, length: number): boolean {
 	return Math.abs(index - position) < BAND / 2 + 0.5
 }
 
+// A Client's props are capped at 100,000 characters; a diff past this is cut at the last hunk that fits.
+export const DIFF_LIMIT = 60_000
+
+export function cutDiff(hunks: string, limit = DIFF_LIMIT): { hunks: string; isTruncated: boolean } {
+	if (hunks.length <= limit) return { hunks, isTruncated: false }
+	const lastHunk = hunks.lastIndexOf('\n@@', limit)
+	const end = lastHunk > 0 ? lastHunk + 1 : hunks.lastIndexOf('\n', limit) + 1
+	return { hunks: hunks.slice(0, end), isTruncated: true }
+}
+
+export function drawDiff(
+	diff: DiffView,
+	{ Box, Text, Button, Code }: Pick<ClientElements, 'Box' | 'Text' | 'Button' | 'Code'>,
+	onBack: () => void,
+) {
+	return (
+		<Box flexDirection="column">
+			<Box flexDirection="row">
+				<Button key="back" plain label="← files" onPress={onBack} />
+				<Text bold>{`  ${diff.path}`}</Text>
+			</Box>
+			<Box flexDirection="column" marginTop={1}>
+				{diff.hunks === '' ? (
+					<Text dimColor>no text diff (binary file)</Text>
+				) : (
+					<Code source={diff.hunks} path={diff.path} format="diff" wrap="truncate-end" />
+				)}
+				{diff.isTruncated && <Text dimColor>… diff truncated</Text>}
+			</Box>
+		</Box>
+	)
+}
+
 export function drawRows(
-	{ rows, hoverBackground }: RowsProps,
+	{ rows, hoverBackground }: Pick<RowsProps, 'rows' | 'hoverBackground'>,
 	{ Box, Text }: Pick<ClientElements, 'Box' | 'Text'>,
 	phase: number,
 	hovered = -1,
@@ -111,6 +147,10 @@ export const Rows: ClientModule<RowsProps, Local> = (props, surface) => {
 	} else if (!isRunning && state.stop) {
 		state.stop()
 		surface.setState({ phase: 0, hovered: state.hovered })
+	}
+	if (props.diff) {
+		surface.onPointer(() => undefined)
+		return drawDiff(props.diff, surface.elements, () => surface.post({ back: true }))
 	}
 	surface.onPointer((event) => {
 		const current = surface.state ?? state

@@ -4,7 +4,7 @@ import type { Color, EngineInterface, Register } from 'claude-code'
 import type { ActiveEdit, ChangedFile, FileDiff, FileStatus, Snapshot } from '../types'
 import { readDiff, readSnapshot } from './git'
 import { rowIcon } from './icons'
-import { drawRows } from './rows'
+import { cutDiff, drawDiff, drawRows } from './rows'
 import type { RowSpec } from './rows'
 import { bashChangedFiles, countsLabel, summarize } from './summary'
 import { BRANCH_ICON, backgroundOption, lighten, resolveGlyphs, statusSymbols } from './symbols'
@@ -162,7 +162,12 @@ export const register: Register = (on, options) => {
 
 	on('ui.message', { requestId: PANE, element: 'rows' }, async ($, e) => {
 		const data = e.data
-		if (typeof data !== 'object' || data === null || !('press' in data) || !('kind' in data)) return {}
+		if (typeof data !== 'object' || data === null) return {}
+		if ('back' in data) {
+			await closeDiff($)
+			return {}
+		}
+		if (!('press' in data) || !('kind' in data)) return {}
 		if (data.kind !== 'file' || typeof data.press !== 'string') return {}
 		const path = data.press
 		await update($, selected, () => path)
@@ -221,6 +226,7 @@ export const register: Register = (on, options) => {
 		const openPath = await read($, selected)
 		const openDiff = await read($, diff)
 		const opened = openPath !== null && openDiff?.path === openPath ? openDiff : null
+		const diffView = opened ? { path: opened.path, ...cutDiff(opened.hunks) } : null
 		const rows = treeRows(withEditedFiles(shown.files, edited)).map((row): RowSpec => ({
 			id: row.id,
 			kind: row.kind,
@@ -240,36 +246,21 @@ export const register: Register = (on, options) => {
 					<Text color="magenta" bold>{`${icon} ${shown.branch}`}</Text>
 					{symbols && <Text color="red" bold>{` [${symbols}]`}</Text>}
 				</Text>
-				{opened ? (
-					<Box flexDirection="column" marginTop={1}>
-						<Box flexDirection="row">
-							<elements.Button key="back" plain label="← files" onPress={() => closeDiff($)} />
-							<Text bold>{`  ${opened.path}`}</Text>
-						</Box>
-						<Box marginTop={1}>
-							{opened.hunks === '' ? (
-								<Text dimColor>no text diff (binary file)</Text>
-							) : (
-								<elements.Code
-									source={opened.hunks}
-									path={opened.path}
-									format="diff"
-									wrap="truncate-end"
-								/>
-							)}
-						</Box>
-					</Box>
-				) : (
-					<Box flexDirection="column" marginTop={1}>
-						{rows.length === 0 ? (
-							<Text dimColor>no changes</Text>
-						) : 'Client' in elements ? (
-							<elements.Client key="rows" module="./rows.tsx" props={{ rows, hoverBackground }} />
-						) : (
-							drawRows({ rows, hoverBackground }, elements, 0)
-						)}
-					</Box>
-				)}
+				<Box flexDirection="column" marginTop={1}>
+					{rows.length === 0 && !diffView ? (
+						<Text dimColor>no changes</Text>
+					) : 'Client' in elements ? (
+						<elements.Client
+							key="rows"
+							module="./rows.tsx"
+							props={{ rows, hoverBackground, diff: diffView }}
+						/>
+					) : diffView ? (
+						drawDiff(diffView, elements, () => void closeDiff($))
+					) : (
+						drawRows({ rows, hoverBackground }, elements, 0)
+					)}
+				</Box>
 			</Box>,
 		)
 	})
