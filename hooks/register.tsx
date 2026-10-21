@@ -102,17 +102,7 @@ export const register: Register = (on, options) => {
 						<Text
 							color={row.status ? STATUS_COLOR[row.status] : undefined}
 						>{`${rowIcon(row.kind, row.name, glyphSet)} `}</Text>
-						{row.status ? (
-							<Text
-								color={STATUS_COLOR[row.status]}
-								strikethrough={row.status === 'deleted'}
-								bold={row.status === 'conflicted'}
-							>
-								{row.name}
-							</Text>
-						) : (
-							<Text>{row.name}</Text>
-						)}
+						<Text strikethrough={row.status === 'deleted'}>{row.name}</Text>
 					</Text>
 				</Box>
 				{row.isBinary ? (

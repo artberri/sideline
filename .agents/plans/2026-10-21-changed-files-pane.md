@@ -21,8 +21,8 @@ runs. A smaller, focused take on [claude-code-filetree](https://github.com/data-
   (`.ai/plans/`). — _proved by:_ `tests/tree.test.ts` › treeRows compacts single-child folder chains…; `tests/git.test.ts` › parseStatus lists each changed file…; `tests/pane.test.ts` › the tree lists changed files under compacted folders…
 - **B7.** Each file shows `+N -N` on the right; an untracked file counts all its lines as added; a folder shows the sum
   of everything under it. A binary file shows `bin`. — _proved by:_ `tests/git.test.ts` › parseNumstat reads counts, renames, binaries and --no-index output; `tests/tree.test.ts` › treeRows sorts folders before files and rolls counts up…; `tests/pane.test.ts` › the tree lists changed files…
-- **B8.** File names are colored by status: added/untracked green, modified yellow, deleted red with strikethrough,
-  renamed blue. — _proved by:_ `tests/pane.test.ts` › the tree lists changed files under compacted folders, with counts and status colors
+- **B8.** Each file's icon is colored by status: added/untracked green, modified yellow, deleted red, renamed blue,
+  conflicted red. The name stays in the default color; a deleted file's name is struck through. — _proved by:_ `tests/pane.test.ts` › the tree lists changed files under compacted folders, with counts and status colors
 - **B9.** The tree and header refresh after every Claude Edit, Write, NotebookEdit or Bash call, and every 2 seconds,
   so changes made outside Claude also show. — _proved by:_ `tests/pane.test.ts` › a Write is followed by a refresh that shows the new file (the 2-second poll: manual)
 - **B10.** While Claude's Edit, Write or NotebookEdit on a file runs, that file's row shimmers; a file that does not
