@@ -2,6 +2,10 @@
 	"name": "vacuo",
 	"version": "0.1.0",
 	"description": "Work-in-progress Claude Code mod",
+	"author": {
+		"name": "Alberto Varela Sánchez",
+		"email": "hello@albertovarela.net"
+	},
 	"types": "./types/index.d.ts",
 	"userConfig": {
 		"glyphs": {
