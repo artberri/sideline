@@ -34,6 +34,9 @@ edited the file.
 - **The diff shows hunks only:** git's file header (`diff --git`, `index`, `---`, `+++`) is dropped, since the pane
   already shows the path, and a `Code` in `format="diff"` reads hunks.
 - **Mobile and VS Code can't click rows yet:** they draw the tree without the `Client`, so there is no pointer there.
+- **A hovered file row reads as clickable:** its name is underlined and, with the `background` option set, the row
+  takes that background lightened by 12%. Tracked from the `Client`'s pointer events, since a declarative `hover` is
+  dropped inside a `Client`. Folders don't react.
 - **Keyboard navigation is a follow-up** (see below): it needs a selected row in the tree first.
 
 ### Engine API (checked in the 2.1.306 typings)
@@ -89,7 +92,7 @@ edited the file.
       errored, disabled by the option, or when there's nothing to summarize.
 - [x] Run `bun run format` and `bun run check`.
 
-## Phase 2: Click a file in the pane to see its diff
+## Phase 2: Click a file in the pane to see its diff ✅
 
 **Description:** A click on a file row opens its diff against `HEAD` in the pane, with a `← files` button back to the
 tree.
@@ -100,7 +103,7 @@ tree.
 - [x] Pane test (B5): an untracked file's diff comes from `--no-index`.
 - [x] Pane test (B6): pressing `← files` goes back to the tree.
 - [x] Pane test (B7): a refresh redraws the diff; a file that leaves the tree closes the diff view.
-- [ ] Manual, live session (B5): clicking a row opens its diff. The kit posts the message; only a real pointer proves
+- [x] Manual, live session (B5): clicking a row opens its diff. The kit posts the message; only a real pointer proves
       the click lands on the right row.
 
 **To-do:**
@@ -119,4 +122,4 @@ tree.
 
 ## Next step
 
-Phase 2: click a file in a live session (the manual test), then mark the phase ✅ and archive the plan.
+All phases are done; the plan is archived.
