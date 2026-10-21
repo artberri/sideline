@@ -6,7 +6,7 @@ import { readDiff, readSnapshot } from './git'
 import { rowIcon } from './icons'
 import { drawRows } from './rows'
 import type { RowSpec } from './rows'
-import { countsLabel, summarize } from './summary'
+import { bashChangedFiles, countsLabel, summarize } from './summary'
 import { BRANCH_ICON, backgroundOption, lighten, resolveGlyphs, statusSymbols } from './symbols'
 import { treeRows } from './tree'
 
@@ -15,6 +15,8 @@ const TITLE = 'Changes'
 const POLL_MS = 2_000
 const REFRESH_AFTER = new Set(['Edit', 'Write', 'NotebookEdit', 'Bash'])
 const FLASH_MS = 1_500
+// Most edits take milliseconds; the shimmer plays at least this long so it can be seen, without delaying the tool.
+const MIN_SHIMMER_MS = 1_200
 // Claude Code's own result gutter, which a row drawn in place of a ToolResult does not get.
 const RESULT_GUTTER = '  ⎿  '
 
@@ -101,6 +103,17 @@ function withEditedFiles(files: ChangedFile[], edited: Map<string, ActiveEdit>):
 	return [...files, ...extra]
 }
 
+// Turns a finished edit into the flash once it has shimmered for MIN_SHIMMER_MS, then clears it.
+async function finishEdit($: EngineInterface, id: string, startedAt: number): Promise<void> {
+	const flash = () => {
+		void update($, edits, (list) => list.map((one) => (one.id === id ? { ...one, state: 'done' } : one)))
+		$.clock.after(FLASH_MS, () => void update($, edits, (list) => list.filter((one) => one.id !== id)))
+	}
+	const wait = MIN_SHIMMER_MS - ((await $.clock.now()) - startedAt)
+	if (wait > 0) $.clock.after(wait, flash)
+	else flash()
+}
+
 export const register: Register = (on, options) => {
 	const background = backgroundOption(options.background)
 	const hoverBackground = background ? lighten(background) : null
@@ -126,18 +139,23 @@ export const register: Register = (on, options) => {
 		const path = editedPath(e)
 		if (!path) {
 			const result = await next(e)
+			if (e.tool === 'Bash' && !result.deny && !result.isError) {
+				const startedAt = await $.clock.now()
+				for (const file of bashChangedFiles(result.result)) {
+					const edit: ActiveEdit = { id: `${e.tool_use_id}:${file.path}`, state: 'running', ...file }
+					await update($, edits, (list) => [...list.filter((one) => one.path !== file.path), edit])
+					await finishEdit($, edit.id, startedAt)
+				}
+			}
 			if (REFRESH_AFTER.has(String(e.tool))) void refresh($)
 			return result
 		}
+		const startedAt = await $.clock.now()
 		const edit: ActiveEdit = { id: e.tool_use_id, path, state: 'running', isNewFile: e.tool === 'Write' }
 		await update($, edits, (list) => [...list.filter((one) => one.path !== path), edit])
 		const result = await next(e)
-		if (result.deny || result.isError) {
-			await update($, edits, (list) => list.filter((one) => one.id !== edit.id))
-		} else {
-			await update($, edits, (list) => list.map((one) => (one.id === edit.id ? { ...one, state: 'done' } : one)))
-			$.clock.after(FLASH_MS, () => void update($, edits, (list) => list.filter((one) => one.id !== edit.id)))
-		}
+		if (result.deny || result.isError) await update($, edits, (list) => list.filter((one) => one.id !== edit.id))
+		else await finishEdit($, edit.id, startedAt)
 		void refresh($)
 		return result
 	})

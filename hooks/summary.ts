@@ -51,3 +51,13 @@ export function countsLabel(summary: FileSummary): string {
 	if (summary.verb === 'Deleted') return `(-${summary.deleted ?? 0})`
 	return `(+${summary.added} -${summary.deleted ?? 0})`
 }
+
+// The files a Bash command changed, as Claude Code reports them under `bashEditDiff`, by absolute path.
+export function bashChangedFiles(output: unknown): { path: string; isNewFile: boolean }[] {
+	if (!isRecord(output) || !isRecord(output.bashEditDiff) || !Array.isArray(output.bashEditDiff.files)) return []
+	return output.bashEditDiff.files
+		.filter(isRecord)
+		.flatMap((file) =>
+			typeof file.filePath === 'string' ? [{ path: file.filePath, isNewFile: file.created === true }] : [],
+		)
+}

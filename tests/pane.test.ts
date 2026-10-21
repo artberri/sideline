@@ -219,7 +219,7 @@ function held(w: World) {
 	return (answer: unknown) => release(answer)
 }
 
-test('a file shimmers while Claude edits it, then flashes once and settles', async ($, on) => {
+test('a quick edit shimmers for a moment, then flashes once and settles', async ($, on) => {
 	const w: World = { status: STATUS }
 	const clock = world(on, w, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
@@ -230,9 +230,30 @@ test('a file shimmers while Claude edits it, then flashes once and settles', asy
 	finish({ result: {} })
 	await call
 	await clock.settle()
+	expect(await litOf($, 'modified.ts')).toBe('running')
+	await clock.advance(1_200)
 	expect(await litOf($, 'modified.ts')).toBe('done')
 	await clock.advance(1_600)
 	expect(await litOf($, 'modified.ts')).toBeNull()
+})
+
+test('files a Bash command changed shimmer and flash too', async ($, on) => {
+	const w: World = { status: STATUS }
+	const clock = world(on, w, [])
+	w.tool = () => ({
+		result: {
+			stdout: '',
+			stderr: '',
+			interrupted: false,
+			bashEditDiff: { moreFiles: 0, files: [{ filePath: '/repo/modified.ts', hunks: [] }] },
+		},
+	})
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	await $.tool.call({ tool: 'Bash', command: "sed -i '' s/a/b/ modified.ts" })
+	await clock.settle()
+	expect(await litOf($, 'modified.ts')).toBe('running')
+	await clock.advance(1_200)
+	expect(await litOf($, 'modified.ts')).toBe('done')
 })
 
 test('a file Claude is writing appears before git lists it', async ($, on) => {
