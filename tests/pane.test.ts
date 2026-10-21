@@ -506,7 +506,7 @@ test('a legend of hotkey buttons explains the keys while there are changes', asy
 	const keys = async () => (await ui.findAll({ type: 'Button' })).map((button) => button.props.hotkey).filter(Boolean)
 	expect(await keys()).toEqual(['j', 'k', 'l'])
 	await ui.post({ press: 'modified.ts', kind: 'file' }, { in: 'rows' })
-	expect(await keys()).toEqual(['h'])
+	expect(await keys()).toEqual(['h', 'j', 'k'])
 	await ui.unmount()
 	w.status = ['# branch.oid 0123456789abcdef', '# branch.head main', ''].join('\0')
 	await clock.advance(2_100)
@@ -524,5 +524,30 @@ test('the legend hotkeys drive the same selection as the tree keys', async ($, o
 	expect((await ui.find({ type: 'Code', in: 'rows' }))?.props).toMatchObject({ path: 'modified.ts' })
 	await ui.press({ key: 'nav-h' })
 	expect(await selectedOf(ui)).toBe('modified.ts')
+	await ui.unmount()
+})
+
+test('in a diff, j/k open the next or previous changed file, and h lands on the last one shown', async ($, on) => {
+	const diffs = {
+		'fresh.ts': '@@ -0,0 +1 @@\n+fresh\n',
+		'modified.ts': MODIFIED_DIFF,
+		'staged.ts': '@@ -1 +1 @@\n-s\n+t\n',
+	}
+	world(on, { status: STATUS, diffs }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await openFile($, 'modified.ts')
+	const shown = async () => (await ui.find({ type: 'Code', in: 'rows' }))?.props.path
+	await ui.key({ key: 'j', in: 'rows' })
+	expect(await shown()).toBe('staged.ts')
+	await ui.key({ key: 'j', in: 'rows' })
+	expect(await shown()).toBe('staged.ts')
+	await ui.press({ key: 'nav-k' })
+	await ui.key({ key: 'up', in: 'rows' })
+	expect(await shown()).toBe('fresh.ts')
+	await ui.key({ key: 'k', in: 'rows' })
+	expect(await shown()).toBe('fresh.ts')
+	await ui.key({ key: 'h', in: 'rows' })
+	expect(await ui.find({ type: 'Code', in: 'rows' })).toBeUndefined()
+	expect(await selectedOf(ui)).toBe('fresh.ts')
 	await ui.unmount()
 })

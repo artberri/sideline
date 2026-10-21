@@ -12,7 +12,7 @@ jump between changed files from the diff, with a legend that tells the user how.
 - **K2.** `Enter`, `l` or `→` on a selected file opens its diff; on a folder they do nothing. — _proved by:_ `tests/pane.test.ts` › enter opens the selected file…; enter on a folder does nothing…
 - **K3.** In the diff, `h`, `←` or `Backspace` goes back to the tree with that file still selected. — _proved by:_ `tests/pane.test.ts` › enter opens the selected file; h goes back with it still selected
 - **K4.** In the diff, `j`/`k` open the next or previous changed file's diff; the diff itself scrolls with the wheel.
-  — _proved by:_
+  — _proved by:_ `tests/pane.test.ts` › in a diff, j/k open the next or previous changed file, and h lands on the last one shown
 - **K5.** The selected row stays in view while it moves, and stays on its file when the tree refreshes; if that file
   leaves the tree, the selection moves to the nearest row. — _proved by:_ `tests/pane.test.ts` › the selection stays on its file across a refresh… (scrolling into view: manual)
 - **K6.** A click selects the row it lands on and, on a file, opens its diff, as before. — _proved by:_ `tests/pane.test.ts` › enter on a folder does nothing; a click on it only selects it
@@ -121,23 +121,23 @@ go back, and a legend explains the keys while there are changes.
 the arrows walk the pane's buttons, not the tree (Claude Code keeps them for the focus ring), which is accepted. Not yet
 seen live: the selected row scrolling into view in a tree longer than the pane.
 
-## Phase 3: Jump between changed files from the diff
+## Phase 3: Jump between changed files from the diff ✅
 
 **Description:** In the diff, `j`/`k` open the next or previous changed file's diff, and the legend shows the diff's
 keys.
 
 **Test Checklist:**
 
-- [ ] Pane test (K4): `j` opens the next file's diff and `k` the previous; at either end nothing changes.
-- [ ] Pane test (K7): the legend in the diff lists `h` back and `j`/`k` next/previous file.
+- [x] Pane test (K4): `j` opens the next file's diff and `k` the previous; at either end nothing changes.
+- [x] Pane test (K7): the legend in the diff lists `h` back and `j`/`k` next/previous file.
 
 **To-do:**
 
-- [ ] In the diff view, `j`/`k` post a step to the next/previous file row; the hook opens that file's diff.
-- [ ] Move the cursor with it, so going back lands on the last file shown.
-- [ ] Legend text per view.
-- [ ] Run `bun run format` and `bun run check`.
+- [x] In the diff view, `j`/`k` post a step to the next/previous file row; the hook opens that file's diff.
+- [x] Move the cursor with it, so going back lands on the last file shown.
+- [x] Legend text per view.
+- [x] Run `bun run format` and `bun run check`.
 
 ## Next step
 
-Phase 3: in the diff, `j`/`k` open the next or previous changed file's diff, with the legend updated.
+All phases are done; the plan is archived.

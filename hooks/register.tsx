@@ -133,14 +133,29 @@ async function select($: EngineInterface, id: string, index: number): Promise<vo
 	await $.ui.scroll({ to: { key: id }, in: PANE }).catch(() => undefined)
 }
 
+// In a diff, j/k open the next or previous changed file's diff, and the selection follows it.
+async function stepDiff($: EngineInterface, rows: TreeRow[], open: string, by: number): Promise<void> {
+	if (by === 0) return
+	const files = rows.flatMap((row, index) => (row.kind === 'file' ? [{ id: row.id, index }] : []))
+	const target = files[files.findIndex((file) => file.id === open) + by]
+	if (!target) return
+	await select($, target.id, target.index)
+	await openFile($, target.id)
+}
+
 // One key, from the rows Client or a legend hotkey: moves the selection, opens its file, or closes the diff.
 async function navigate($: EngineInterface, key: string): Promise<void> {
-	if ((await read($, selected)) !== null) {
-		if (BACK.has(key)) await closeDiff($)
+	const open = await read($, selected)
+	if (open !== null && BACK.has(key)) {
+		await closeDiff($)
 		return
 	}
 	const tree = await currentTree($)
 	if (!tree || tree.rows.length === 0) return
+	if (open !== null) {
+		await stepDiff($, tree.rows, open, DOWN.has(key) ? 1 : UP.has(key) ? -1 : 0)
+		return
+	}
 	const at = resolveCursor(tree.rows, await read($, cursor))
 	const last = tree.rows.length - 1
 	if (OPEN.has(key)) {
@@ -319,15 +334,35 @@ export const register: Register = (on, options) => {
 					<Box flexGrow={1} flexDirection="column" justifyContent="flex-end" marginTop={1}>
 						<Box flexDirection="row">
 							{diffView ? (
-								<elements.Button
-									key="nav-h"
-									plain
-									dimColor
-									autoFocus
-									hotkey="h"
-									label="back"
-									onPress={() => navigate($, 'h')}
-								/>
+								<Box flexDirection="row">
+									<elements.Button
+										key="nav-h"
+										plain
+										dimColor
+										autoFocus
+										hotkey="h"
+										label="back"
+										onPress={() => navigate($, 'h')}
+									/>
+									<Text> </Text>
+									<elements.Button
+										key="nav-j"
+										plain
+										dimColor
+										hotkey="j"
+										label="next file"
+										onPress={() => navigate($, 'j')}
+									/>
+									<Text> </Text>
+									<elements.Button
+										key="nav-k"
+										plain
+										dimColor
+										hotkey="k"
+										label="previous file"
+										onPress={() => navigate($, 'k')}
+									/>
+								</Box>
 							) : (
 								<Box flexDirection="row">
 									<elements.Button
