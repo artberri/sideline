@@ -113,7 +113,7 @@ symbols. The tree area is empty for now.
 - [x] Run `bun run format` and `bun run check`.
 - [x] Manual: check the header in a live session on the monorepo.
 
-## Phase 2: List changed files with line counts
+## Phase 2: List changed files with line counts ✅
 
 **Description:** The pane draws the tree of changed files under compacted folders, each with `+N -N`, colored by
 status, refreshed after Claude's tool calls and on the poll.
@@ -124,7 +124,7 @@ status, refreshed after Claude's tool calls and on the poll.
 - [x] Unit test (B6): the tree builder compacts single-child chains and keeps folders with files expanded.
 - [x] Unit test (B7): numstat parsing (including renames and `-` for binary) and folder roll-up.
 - [x] Pane test (B9): a `Write` through `$.tool.call` is followed by a refresh that shows the new file.
-- [ ] Manual, live session (B9): an edit made in an editor outside Claude appears within 2 seconds. A test can't
+- [x] Manual, live session (B9): an edit made in an editor outside Claude appears within 2 seconds. A test can't
       reproduce the timing of an outside writer.
 
 **To-do:**
@@ -159,4 +159,4 @@ status, refreshed after Claude's tool calls and on the poll.
 
 ## Next step
 
-Phase 2: check the tree in a live session, including an edit made outside Claude (the manual test), then mark the phase ✅.
+Phase 3: record Claude's active edits from a `tool.call` hook, then draw the rows through a `Client` module that shimmers them.
