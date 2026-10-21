@@ -79,7 +79,7 @@ Clone into the scratchpad for reference; never copy it into this repo wholesale.
   `git diff --no-index --numstat -- /dev/null <file>` (capped, so a huge untracked folder can't stall the poll).
 - **Test suites:** `tests/*.test.ts(x)` run by `claude plugin test .`.
 
-## Phase 1: Open a pane with the branch header
+## Phase 1: Open a pane with the branch header ✅
 
 **Description:** The pane opens at session start and on `/vacuo`, showing the branch icon, name and starship status
 symbols. The tree area is empty for now.
@@ -103,7 +103,7 @@ symbols. The tree area is empty for now.
 - [x] In `hooks/register.tsx`: register `/vacuo`, open the pane at `session.start`, draw the header in `ui.render`.
 - [x] Refresh the snapshot on a 2-second `$.clock.every` (B9, header half).
 - [x] Run `bun run format` and `bun run check`.
-- [ ] Manual: check the header in a live session on the monorepo.
+- [x] Manual: check the header in a live session on the monorepo.
 
 ## Phase 2: List changed files with line counts
 
@@ -151,4 +151,4 @@ status, refreshed after Claude's tool calls and on the poll.
 
 ## Next step
 
-Phase 1: check the header in a live session (the last to-do), then mark the phase ✅.
+Phase 2: parse the file entries from `porcelain=v2` and read `git diff HEAD --numstat -z`, then build and draw the tree.
