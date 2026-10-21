@@ -47,6 +47,8 @@ export const register: Register = (on, options) => {
 				backgroundColor={background}
 				width={e.props.bodyColumns}
 				minHeight={e.props.scroll.bodyRows}
+				paddingX={1}
+				paddingY={1}
 			>
 				{body}
 			</Box>
