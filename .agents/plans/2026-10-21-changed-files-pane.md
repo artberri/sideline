@@ -26,9 +26,9 @@ runs. A smaller, focused take on [claude-code-filetree](https://github.com/data-
 - **B9.** The tree and header refresh after every Claude Edit, Write, NotebookEdit or Bash call, and every 2 seconds,
   so changes made outside Claude also show. — _proved by:_ `tests/pane.test.ts` › a Write is followed by a refresh that shows the new file (the 2-second poll: manual)
 - **B10.** While Claude's Edit, Write or NotebookEdit on a file runs, that file's row shimmers; a file that does not
-  exist yet appears as a shimmering row immediately. — _proved by:_
+  exist yet appears as a shimmering row immediately. — _proved by:_ `tests/pane.test.ts` › a file shimmers while Claude edits it…; a file Claude is writing appears before git lists it; the shimmer moves across the name on the frame clock
 - **B11.** When the edit finishes, the row flashes once and returns to its status color within about 2 seconds; a
-  failed or denied edit stops the shimmer without a flash. — _proved by:_
+  failed or denied edit stops the shimmer without a flash. — _proved by:_ `tests/pane.test.ts` › a file shimmers while Claude edits it, then flashes once and settles; a denied edit stops the shimmer without a flash
 - **B12.** Each row starts with an icon: a Nerd Font glyph by file name, then by extension (a generic file icon
   otherwise, an open folder for folders), or `▾` and `·` with plain glyphs. — _proved by:_ `tests/icons.test.ts` › the three
   rowIcon tests
@@ -49,6 +49,9 @@ runs. A smaller, focused take on [claude-code-filetree](https://github.com/data-
 - **Colors follow the user's terminal and theme:** ANSI names (`magenta`, `red`) or Claude Code theme keys
   (`success`, `warning`, `error`, `diffAdded`, `diffRemoved`), never hex, so the pane uses the person's own palette.
   The pane's background is drawn by Claude Code and can't be set by the mod.
+- **Shimmer without hex tones:** the band sweeps across the name in Claude Code's `claude` theme color, bright and
+  bold inside the band and dim outside, and the flash is the `success` color. On surfaces with no `Client` (mobile,
+  VS Code) the rows draw the same, without the animation.
 - **Left out on purpose** (each can become its own plan): search, file preview, opening files, read highlights,
   git-action animations, themes and palettes, mouse and keyboard navigation, size/date columns.
 
@@ -142,21 +145,21 @@ status, refreshed after Claude's tool calls and on the poll.
 
 **Test Checklist:**
 
-- [ ] Pane test (B10): during a held `Edit` the row's segment is marked running; a path not yet in the tree appears.
-- [ ] Pane test (B11): after the edit settles the row is marked done, then cleared after the flash; a denied edit
+- [x] Pane test (B10): during a held `Edit` the row's segment is marked running; a path not yet in the tree appears.
+- [x] Pane test (B11): after the edit settles the row is marked done, then cleared after the flash; a denied edit
       clears it without a done mark.
-- [ ] Client test (B10, B11): the rows module advances its shimmer phase on `surface.every` and stops its timer when
+- [x] Client test (B10, B11): the rows module advances its shimmer phase on `surface.every` and stops its timer when
       nothing is lit.
 - [ ] Manual, live session (B10): the shimmer shows during "Updating …" on a real edit. The kit can't show paint.
 
 **To-do:**
 
-- [ ] Record active edits in `$.state` from a `tool.call` hook before `next(e)`, resolving the path against the repo.
-- [ ] Mark done or clear after `next(e)` resolves, and expire done marks after the flash.
-- [ ] Add `hooks/rows.tsx`: a `Client` module that draws the rows and animates lit ones with a shimmer.
-- [ ] Switch the pane's tree to the `Client` module.
-- [ ] Run `bun run format` and `bun run check`.
+- [x] Record active edits in `$.state` from a `tool.call` hook before `next(e)`, resolving the path against the repo.
+- [x] Mark done or clear after `next(e)` resolves, and expire done marks after the flash.
+- [x] Add `hooks/rows.tsx`: a `Client` module that draws the rows and animates lit ones with a shimmer.
+- [x] Switch the pane's tree to the `Client` module.
+- [x] Run `bun run format` and `bun run check`.
 
 ## Next step
 
-Phase 3: record Claude's active edits from a `tool.call` hook, then draw the rows through a `Client` module that shimmers them.
+Phase 3: watch a real edit shimmer in a live session (the manual test), then mark the phase ✅ and archive the plan.

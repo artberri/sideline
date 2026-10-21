@@ -1,20 +1,23 @@
 import { atom, read, update } from 'claude-code'
 import type { Color, EngineInterface, Register } from 'claude-code'
 
-import type { FileStatus, Snapshot } from '../types'
+import type { ActiveEdit, ChangedFile, FileStatus, Snapshot } from '../types'
 import { readSnapshot } from './git'
 import { rowIcon } from './icons'
+import { drawRows } from './rows'
+import type { RowSpec } from './rows'
 import { BRANCH_ICON, backgroundOption, resolveGlyphs, statusSymbols } from './symbols'
 import { treeRows } from './tree'
-import type { TreeRow } from './tree'
 
 const PANE = 'vacuo'
 const TITLE = 'Changes'
 const POLL_MS = 2_000
 const REFRESH_AFTER = new Set(['Edit', 'Write', 'NotebookEdit', 'Bash'])
+const FLASH_MS = 1_500
 
 const snapshot = atom({ plugin: 'vacuo', key: 'snapshot' } as const, { kind: 'loading' } as Snapshot)
 const glyphs = atom({ plugin: 'vacuo', key: 'glyphs' } as const, 'plain')
+const edits = atom({ plugin: 'vacuo', key: 'edits' } as const, [] as ActiveEdit[])
 
 const STATUS_COLOR: Record<FileStatus, Color> = {
 	added: 'success',
@@ -51,6 +54,28 @@ function refresh($: EngineInterface): Promise<void> {
 	return refreshing
 }
 
+function editedPath(e: { tool: string } & Record<string, unknown>): string | undefined {
+	if (e.tool === 'NotebookEdit' && typeof e.notebook_path === 'string') return e.notebook_path
+	if ((e.tool === 'Edit' || e.tool === 'Write') && typeof e.file_path === 'string') return e.file_path
+	return undefined
+}
+
+// Files Claude is editing that git does not list yet (a new file, or one that was clean) still get a row.
+function withEditedFiles(files: ChangedFile[], edited: Map<string, ActiveEdit>): ChangedFile[] {
+	const listed = new Set(files.map((file) => file.path))
+	const extra = [...edited]
+		.filter(([path]) => !listed.has(path))
+		.map(([path, edit]): ChangedFile => ({
+			path,
+			status: edit.isNewFile ? 'added' : 'modified',
+			isUntracked: edit.isNewFile,
+			added: 0,
+			deleted: 0,
+			isBinary: false,
+		}))
+	return [...files, ...extra]
+}
+
 export const register: Register = (on, options) => {
 	const background = backgroundOption(options.background)
 
@@ -71,13 +96,28 @@ export const register: Register = (on, options) => {
 	})
 
 	on('tool.call', async ($, e, next) => {
+		const path = editedPath(e)
+		if (!path) {
+			const result = await next(e)
+			if (REFRESH_AFTER.has(String(e.tool))) void refresh($)
+			return result
+		}
+		const edit: ActiveEdit = { id: e.tool_use_id, path, state: 'running', isNewFile: e.tool === 'Write' }
+		await update($, edits, (list) => [...list.filter((one) => one.path !== path), edit])
 		const result = await next(e)
-		if (REFRESH_AFTER.has(String(e.tool))) void refresh($)
+		if (result.deny || result.isError) {
+			await update($, edits, (list) => list.filter((one) => one.id !== edit.id))
+		} else {
+			await update($, edits, (list) => list.map((one) => (one.id === edit.id ? { ...one, state: 'done' } : one)))
+			$.clock.after(FLASH_MS, () => void update($, edits, (list) => list.filter((one) => one.id !== edit.id)))
+		}
+		void refresh($)
 		return result
 	})
 
 	on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-		const { Box, Text } = $.ui.resolve(e)
+		const elements = $.ui.resolve(e)
+		const { Box, Text } = elements
 		const shown = await read($, snapshot)
 		const glyphSet = await read($, glyphs)
 		const icon = BRANCH_ICON[glyphSet]
@@ -93,32 +133,27 @@ export const register: Register = (on, options) => {
 				{body}
 			</Box>
 		)
-		// oxlint-disable-next-line unicorn/consistent-function-scoping -- it reads Box and Text from $.ui.resolve through JSX
-		const line = (row: TreeRow) => (
-			<Box key={row.id} flexDirection="row">
-				<Box flexGrow={1} flexShrink={1} overflow="hidden">
-					<Text wrap="truncate-end">
-						{'  '.repeat(row.depth)}
-						<Text
-							color={row.status ? STATUS_COLOR[row.status] : undefined}
-						>{`${rowIcon(row.kind, row.name, glyphSet)} `}</Text>
-						<Text strikethrough={row.status === 'deleted'}>{row.name}</Text>
-					</Text>
-				</Box>
-				{row.isBinary ? (
-					<Text dimColor> bin</Text>
-				) : (
-					<Text>
-						{row.added > 0 && <Text color="success">{` +${row.added}`}</Text>}
-						{row.deleted > 0 && <Text color="error">{` -${row.deleted}`}</Text>}
-					</Text>
-				)}
-			</Box>
-		)
 		if (shown.kind === 'loading') return fill(<Text> </Text>)
 		if (shown.kind === 'none') return fill(<Text dimColor>not a git repo</Text>)
 		const symbols = statusSymbols(shown.status)
-		const rows = treeRows(shown.files)
+		const root = `${shown.root}/`
+		const edited = new Map(
+			(await read($, edits))
+				.filter((edit) => edit.path.startsWith(root))
+				.map((edit) => [edit.path.slice(root.length), edit]),
+		)
+		const rows = treeRows(withEditedFiles(shown.files, edited)).map((row): RowSpec => ({
+			id: row.id,
+			indent: '  '.repeat(row.depth),
+			icon: rowIcon(row.kind, row.name, glyphSet),
+			iconColor: row.status ? STATUS_COLOR[row.status] : null,
+			name: row.name,
+			isStruck: row.status === 'deleted',
+			lit: (row.kind === 'file' && edited.get(row.id)?.state) || null,
+			added: row.added,
+			deleted: row.deleted,
+			isBinary: row.isBinary,
+		}))
 		return fill(
 			<Box flexDirection="column">
 				<Text>
@@ -126,7 +161,13 @@ export const register: Register = (on, options) => {
 					{symbols && <Text color="red" bold>{` [${symbols}]`}</Text>}
 				</Text>
 				<Box flexDirection="column" marginTop={1}>
-					{rows.length === 0 ? <Text dimColor>no changes</Text> : rows.map(line)}
+					{rows.length === 0 ? (
+						<Text dimColor>no changes</Text>
+					) : 'Client' in elements ? (
+						<elements.Client key="rows" module="./rows.tsx" props={{ rows }} />
+					) : (
+						drawRows(rows, elements, 0)
+					)}
 				</Box>
 			</Box>,
 		)

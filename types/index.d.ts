@@ -21,10 +21,21 @@ export type ChangedFile = LineCounts & { path: string; status: FileStatus; isUnt
 export type Snapshot =
 	| { kind: 'loading' }
 	| { kind: 'none' }
-	| { kind: 'repo'; branch: string; isDetached: boolean; status: BranchStatus; files: ChangedFile[] }
+	| {
+			kind: 'repo'
+			root: string
+			branch: string
+			isDetached: boolean
+			status: BranchStatus
+			files: ChangedFile[]
+	  }
+
+// A file Claude is editing (`running`) or just finished editing (`done`, shown as a flash until it expires), by
+// absolute path.
+export type ActiveEdit = { id: string; path: string; state: 'running' | 'done'; isNewFile: boolean }
 
 declare module 'claude-code' {
 	interface PluginState {
-		vacuo: { snapshot: Snapshot; glyphs: Glyphs }
+		vacuo: { snapshot: Snapshot; glyphs: Glyphs; edits: ActiveEdit[] }
 	}
 }

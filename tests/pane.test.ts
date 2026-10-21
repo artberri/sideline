@@ -8,6 +8,7 @@ type World = {
 	untracked?: Record<string, string>
 	hasStash?: boolean
 	hasNerdFont?: boolean
+	tool?: () => unknown
 }
 
 const PANE = {
@@ -51,17 +52,18 @@ function world(on: On, w: World, opens: string[]) {
 		if (argv[0] === 'sh') return done(0, w.hasNerdFont ? 'nerd\n' : 'plain\n')
 		if (argv.includes('status')) return w.status === undefined ? done(128) : done(0, w.status)
 		if (argv.includes('refs/stash')) return done(w.hasStash ? 0 : 1)
+		if (argv.includes('--show-toplevel')) return done(0, '/repo\n')
 		if (argv.includes('--no-index')) return done(1, w.untracked?.[argv.at(-1) ?? ''] ?? '')
 		if (argv.includes('diff')) return done(0, w.numstat ?? '')
 		return done(0)
 	})
-	on('tool.call', () => ({ result: {} }))
+	on('tool.call', () => (w.tool?.() ?? { result: {} }) as { result: Record<string, never> })
 	return clock
 }
 
 async function drawn($: Engine, surface: 'terminal' | 'desktop') {
 	const ui = await $.ui.mount({ ...PANE, surface })
-	const text = JSON.stringify(await ui.drawn())
+	const text = JSON.stringify(await ui.drawn()) + JSON.stringify(await ui.drawn({ in: 'rows' }).catch(() => null))
 	await ui.unmount()
 	return text
 }
@@ -160,20 +162,20 @@ test('the tree lists changed files under compacted folders, with counts and stat
 	)
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-	const text = async (re: RegExp) => (await ui.find({ type: 'Text', text: re }))?.text
+	const text = async (re: RegExp) => (await ui.find({ type: 'Text', text: re, in: 'rows' }))?.text
 	expect(await text(/\.ai\/plans\//)).toContain('.ai/plans/')
 	expect(await text(/plan\.md/)).toContain('  · plan.md')
 	expect(await text(/^src\/$/)).toBe('src/')
-	const tree = JSON.stringify(await ui.drawn())
+	const tree = JSON.stringify(await ui.drawn({ in: 'rows' }))
 	expect(tree).toContain('" +3"')
 	expect(tree).toContain('" -1"')
 	expect(tree).toContain('" +4"')
 	expect(tree).toContain('" -5"')
 	expect(tree).toContain('" bin"')
-	const gone = await ui.find({ type: 'Text', text: /^gone\.ts$/ })
+	const gone = await ui.find({ type: 'Text', text: /^gone\.ts$/, in: 'rows' })
 	expect(gone?.props).toMatchObject({ strikethrough: true })
 	expect(gone?.props.color).toBeUndefined()
-	const iconColors = (await ui.findAll({ type: 'Text', text: /^· $/ })).map((icon) => icon.props.color)
+	const iconColors = (await ui.findAll({ type: 'Text', text: /^· $/, in: 'rows' })).map((icon) => icon.props.color)
 	expect(iconColors).toEqual(['warning', 'success', 'error', 'warning', 'blue'])
 	await ui.unmount()
 })
@@ -187,4 +189,86 @@ test('a Write is followed by a refresh that shows the new file', async ($, on) =
 	await $.tool.call({ tool: 'Write', file_path: '/repo/written.ts', content: 'x' })
 	await clock.settle()
 	expect(await drawn($, 'terminal')).toContain('written.ts')
+})
+
+type Child = { props?: { color?: string } }
+
+// What a file's row shows: the shimmer paints its icon in Claude's color, the flash paints its name green.
+async function litOf($: Engine, name: string): Promise<'running' | 'done' | null | 'absent'> {
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	const escaped = name.replaceAll('.', '\\.')
+	const row = await ui.find({ type: 'Text', text: new RegExp(`^\\s*\\S+ ${escaped}$`), in: 'rows' })
+	await ui.unmount()
+	if (!row) return 'absent'
+	const [, icon, label] = (row.children ?? []) as Child[]
+	if (icon?.props?.color === 'claude') return 'running'
+	if (label?.props?.color === 'success') return 'done'
+	return null
+}
+
+const ignore = (): void => undefined
+
+// Holds the next tool call open until the returned function answers it.
+function held(w: World) {
+	let release: (answer: unknown) => void = ignore
+	w.tool = () => new Promise((resolve) => (release = resolve))
+	return (answer: unknown) => release(answer)
+}
+
+test('a file shimmers while Claude edits it, then flashes once and settles', async ($, on) => {
+	const w: World = { status: STATUS }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const finish = held(w)
+	const call = $.tool.call({ tool: 'Edit', file_path: '/repo/modified.ts', old_string: 'a', new_string: 'b' })
+	await clock.settle()
+	expect(await litOf($, 'modified.ts')).toBe('running')
+	finish({ result: {} })
+	await call
+	await clock.settle()
+	expect(await litOf($, 'modified.ts')).toBe('done')
+	await clock.advance(1_600)
+	expect(await litOf($, 'modified.ts')).toBeNull()
+})
+
+test('a file Claude is writing appears before git lists it', async ($, on) => {
+	const w: World = { status: STATUS }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const finish = held(w)
+	const call = $.tool.call({ tool: 'Write', file_path: '/repo/src/brand-new.ts', content: 'x' })
+	await clock.settle()
+	expect(await litOf($, 'brand-new.ts')).toBe('running')
+	finish({ result: {} })
+	await call
+})
+
+test('a denied edit stops the shimmer without a flash', async ($, on) => {
+	const w: World = { status: STATUS }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const finish = held(w)
+	const call = $.tool.call({ tool: 'Edit', file_path: '/repo/modified.ts', old_string: 'a', new_string: 'b' })
+	await clock.settle()
+	finish({ deny: 'not now' })
+	await call
+	await clock.settle()
+	expect(await litOf($, 'modified.ts')).toBeNull()
+})
+
+test('the shimmer moves across the name on the frame clock', async ($, on) => {
+	const w: World = { status: STATUS }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const finish = held(w)
+	const call = $.tool.call({ tool: 'Edit', file_path: '/repo/modified.ts', old_string: 'a', new_string: 'b' })
+	await clock.settle()
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	const bright = async () => JSON.stringify(await ui.findAll({ type: 'Text', in: 'rows' }))
+	const before = await bright()
+	await ui.advance(300)
+	expect(await bright()).not.toBe(before)
+	await ui.unmount()
+	finish({ result: {} })
+	await call
 })

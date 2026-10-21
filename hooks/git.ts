@@ -82,7 +82,7 @@ export function parseStatus(stdout: string): RepoSnapshot {
 		}
 	}
 	const isDetached = head === '(detached)'
-	return { kind: 'repo', branch: isDetached ? oid.slice(0, 7) : head, isDetached, status, files }
+	return { kind: 'repo', root: '', branch: isDetached ? oid.slice(0, 7) : head, isDetached, status, files }
 }
 
 // `git diff --numstat -z`: `added\tdeleted\tpath\0`, or `added\tdeleted\t\0from\0to\0` for a rename (and for
@@ -119,6 +119,8 @@ export async function readSnapshot($: EngineInterface, cwd: string): Promise<Sna
 	const run = await git($, cwd, ['status', '--porcelain=v2', '--branch', '-z', '--untracked-files=all'])
 	if (run.exitCode !== 0) return { kind: 'none' }
 	const snapshot = parseStatus(run.stdout)
+	const top = await git($, cwd, ['rev-parse', '--show-toplevel'])
+	snapshot.root = top.stdout.trim()
 	const stash = await git($, cwd, ['rev-parse', '--verify', '--quiet', 'refs/stash'])
 	snapshot.status.stashed = stash.exitCode === 0
 	const tracked = await git($, cwd, ['diff', 'HEAD', '--numstat', '-z'])
