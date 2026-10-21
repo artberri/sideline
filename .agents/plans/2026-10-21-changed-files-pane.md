@@ -29,6 +29,9 @@ runs. A smaller, focused take on [claude-code-filetree](https://github.com/data-
   exist yet appears as a shimmering row immediately. — _proved by:_
 - **B11.** When the edit finishes, the row flashes once and returns to its status color within about 2 seconds; a
   failed or denied edit stops the shimmer without a flash. — _proved by:_
+- **B12.** Each row starts with an icon: a Nerd Font glyph by file name, then by extension (a generic file icon
+  otherwise, an open folder for folders), or `▾` and `·` with plain glyphs. — _proved by:_ `tests/icons.test.ts` › the three
+  rowIcon tests
 
 ## Context
 
@@ -41,6 +44,8 @@ runs. A smaller, focused take on [claude-code-filetree](https://github.com/data-
 - **Nerd Font glyphs with plain fallbacks.** A `glyphs` `userConfig` option (`auto` default, `nerd`, `plain`). `auto`
   runs a light check: `fc-list ':charset=e0a0'`, then `~/Library/Fonts/*Nerd*` and `/Library/Fonts/*Nerd*`. This is
   the first half of filetree's `FONT_SCRIPT`, without its stale-terminal check.
+- **Icons are our own table** (`hooks/icons.ts`), built from nerd-fonts' `glyphnames.json` (`seti-*`, `dev-*`,
+  `custom-*`), not copied from filetree.
 - **Colors follow the user's terminal and theme:** ANSI names (`magenta`, `red`) or Claude Code theme keys
   (`success`, `warning`, `error`, `diffAdded`, `diffRemoved`), never hex, so the pane uses the person's own palette.
   The pane's background is drawn by Claude Code and can't be set by the mod.

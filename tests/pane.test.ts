@@ -162,7 +162,7 @@ test('the tree lists changed files under compacted folders, with counts and stat
 	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
 	const text = async (re: RegExp) => (await ui.find({ type: 'Text', text: re }))?.text
 	expect(await text(/\.ai\/plans\//)).toContain('.ai/plans/')
-	expect(await text(/plan\.md/)).toContain('  plan.md')
+	expect(await text(/plan\.md/)).toContain('  · plan.md')
 	expect(await text(/^src\/$/)).toBe('src/')
 	const tree = JSON.stringify(await ui.drawn())
 	expect(tree).toContain('" +3"')

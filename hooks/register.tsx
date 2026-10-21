@@ -3,6 +3,7 @@ import type { Color, EngineInterface, Register } from 'claude-code'
 
 import type { FileStatus, Snapshot } from '../types'
 import { readSnapshot } from './git'
+import { rowIcon } from './icons'
 import { BRANCH_ICON, backgroundOption, resolveGlyphs, statusSymbols } from './symbols'
 import { treeRows } from './tree'
 import type { TreeRow } from './tree'
@@ -78,7 +79,8 @@ export const register: Register = (on, options) => {
 	on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
 		const { Box, Text } = $.ui.resolve(e)
 		const shown = await read($, snapshot)
-		const icon = BRANCH_ICON[await read($, glyphs)]
+		const glyphSet = await read($, glyphs)
+		const icon = BRANCH_ICON[glyphSet]
 		const fill = (body: JSX.Element) => (
 			<Box
 				flexDirection="column"
@@ -97,6 +99,9 @@ export const register: Register = (on, options) => {
 				<Box flexGrow={1} flexShrink={1} overflow="hidden">
 					<Text wrap="truncate-end">
 						{'  '.repeat(row.depth)}
+						<Text
+							color={row.status ? STATUS_COLOR[row.status] : undefined}
+						>{`${rowIcon(row.kind, row.name, glyphSet)} `}</Text>
 						{row.status ? (
 							<Text
 								color={STATUS_COLOR[row.status]}
