@@ -8,17 +8,18 @@ jump between changed files from the diff, with a legend that tells the user how.
 ## Behaviour
 
 - **K1.** Once the tree has the keyboard, `j`/`↓` and `k`/`↑` move a selection highlight through the rows (the hover
-  style: the Background option lightened, or inverted text without one). — _proved by:_
-- **K2.** `Enter`, `l` or `→` on a selected file opens its diff; on a folder they do nothing. — _proved by:_
-- **K3.** In the diff, `h`, `←` or `Backspace` goes back to the tree with that file still selected. — _proved by:_
+  style: the Background option lightened, or inverted text without one). — _proved by:_ `tests/pane.test.ts` › j/k and the arrows move the selection through the rows; with a background, the selected row takes the hover background
+- **K2.** `Enter`, `l` or `→` on a selected file opens its diff; on a folder they do nothing. — _proved by:_ `tests/pane.test.ts` › enter opens the selected file…; enter on a folder does nothing…
+- **K3.** In the diff, `h`, `←` or `Backspace` goes back to the tree with that file still selected. — _proved by:_ `tests/pane.test.ts` › enter opens the selected file; h goes back with it still selected
 - **K4.** In the diff, `j`/`k` open the next or previous changed file's diff; the diff itself scrolls with the wheel.
   — _proved by:_
 - **K5.** The selected row stays in view while it moves, and stays on its file when the tree refreshes; if that file
-  leaves the tree, the selection moves to the nearest row. — _proved by:_
-- **K6.** A click selects the row it lands on and, on a file, opens its diff, as before. — _proved by:_
-- **K7.** While there are changes, a dim legend at the bottom of the pane says how to use it: how to focus the pane from
-  the keyboard (ctrl+x tab) or with a click, the keys that apply in the current view, and `esc` back to the prompt. It
-  is hidden when there are no changes. — _proved by:_
+  leaves the tree, the selection moves to the nearest row. — _proved by:_ `tests/pane.test.ts` › the selection stays on its file across a refresh… (scrolling into view: manual)
+- **K6.** A click selects the row it lands on and, on a file, opens its diff, as before. — _proved by:_ `tests/pane.test.ts` › enter on a folder does nothing; a click on it only selects it
+- **K7.** While there are changes, the bottom of the pane shows the keys as hotkey buttons (`j` down, `k` up, `l` open;
+  `h` back in a diff) that work after ctrl+x tab or a click, and a dim line `click or ctrl+x tab to focus · esc prompt`.
+  It is hidden when there are no changes. — _proved by:_ `tests/pane.test.ts` › a legend of hotkey buttons explains the
+  keys…; the legend hotkeys drive the same selection as the tree keys
 - **K8.** Clicking a file keeps the keyboard in the pane: the diff opens in the same place, so the keys keep working.
   — _proved by:_ `tests/pane.test.ts` › clicking a file opens its diff inside the rows Client, without git headers (focus: manual)
 
@@ -31,14 +32,17 @@ jump between changed files from the diff, with a legend that tells the user how.
   focus. filetree draws its preview in the same element for the same reason.
 - **A diff larger than ~60,000 characters is cut** with a `… diff truncated` line, since a `Client`'s props are capped
   at 100,000 characters serialized.
-- **The selection lives in the `Client`'s local state:** simpler and immediate; it is lost on a reload of the mod, which
-  only happens while developing.
+- **The selection lives in the mod's state** (`cursor`: row id and index), not the `Client`'s: the legend's hotkey
+  buttons move it too, from the pane hook. Changed in Phase 2's live check: ctrl+x tab focuses the pane, but keys only
+  reach a `Client` a click focused, so ctrl+x tab needs hotkeys. The `Client` posts each key to the hooks.
 - **The rows `Client` always registers `onKey`:** without a key listener a click does not hand it the keyboard (found
   in Phase 1's live check; filetree registers one too).
 - **`j`/`k` in a diff move between files** (like filetree), not lines: scrolling by line would mean drawing the diff
   ourselves instead of with `Code`.
-- **The legend is honest about focus:** if ctrl+x tab focuses the pane but doesn't hand keys to the `Client` (to check
-  live in Phase 2), the legend says only "click to focus".
+- **The legend is a row of hotkey buttons** (`j` down, `k` up, `l` open in the tree; `h` back in a diff), as filetree's
+  shortcut row: a `Button`'s `hotkey` is pressed whenever the pane holds the keyboard, ctrl+x tab included, and
+  `autoFocus` on `open`/`back` makes `Enter` press it. A dim line under it says `click or ctrl+x tab to focus · esc
+  prompt`.
 
 ### Engine API (checked in the 2.1.306 typings)
 
@@ -87,31 +91,35 @@ a diff keeps the keyboard in the pane. It looks the same.
 - [x] Handle `{ back: true }` in the `ui.message` hook; drop the pane-level diff view.
 - [x] Run `bun run format` and `bun run check`.
 
-## Phase 2: Move a selection and open diffs from the keyboard
+## Phase 2: Move a selection and open diffs from the keyboard ✅
 
 **Description:** `j`/`k`/arrows move a highlighted selection, `Enter`/`l`/`→` open a file's diff, `h`/`←`/`Backspace`
 go back, and a legend explains the keys while there are changes.
 
 **Test Checklist:**
 
-- [ ] Pane test (K1): `j` and `↓` move the selection down, `k` and `↑` up; the selected row is highlighted.
-- [ ] Pane test (K2): `Enter` on a file opens its diff; on a folder nothing happens.
-- [ ] Pane test (K3): `h` in the diff goes back with the file still selected.
-- [ ] Pane test (K5): a refresh keeps the selection on its file; a file that leaves moves it to the nearest row.
-- [ ] Pane test (K6): a click selects the row.
-- [ ] Pane test (K7): the legend shows with changes, hides with none, and lists the tree's keys.
-- [ ] Manual, live session (K5, K7): the selected row scrolls into view in a long tree; ctrl+x tab hands keys to the
+- [x] Pane test (K1): `j` and `↓` move the selection down, `k` and `↑` up; the selected row is highlighted.
+- [x] Pane test (K2): `Enter` on a file opens its diff; on a folder nothing happens.
+- [x] Pane test (K3): `h` in the diff goes back with the file still selected.
+- [x] Pane test (K5): a refresh keeps the selection on its file; a file that leaves moves it to the nearest row.
+- [x] Pane test (K6): a click selects the row.
+- [x] Pane test (K7): the legend shows with changes, hides with none, and lists the tree's keys.
+- [x] Manual, live session (K5, K7): the selected row scrolls into view in a long tree; ctrl+x tab hands keys to the
       tree (adjust the legend if not). The kit can't show focus or the pane's scroll.
 
 **To-do:**
 
-- [ ] `hooks/rows.tsx`: local `cursor` by row id, `onKey` for `j`/`k`/arrows/`Enter`/`l`/`→`/`h`/`←`/`Backspace`.
-- [ ] Draw the selected row with the hover style; a click sets the cursor.
-- [ ] Post `open`/`back` from keys; keep the cursor on its id across new props, falling back to the nearest index.
-- [ ] Reveal the selected row with `$.ui.scroll` from the `ui.message` hook (or drop it if it can't reach inside a
+- [x] `hooks/rows.tsx`: local `cursor` by row id, `onKey` for `j`/`k`/arrows/`Enter`/`l`/`→`/`h`/`←`/`Backspace`.
+- [x] Draw the selected row with the hover style; a click sets the cursor.
+- [x] Post `open`/`back` from keys; keep the cursor on its id across new props, falling back to the nearest index.
+- [x] Reveal the selected row with `$.ui.scroll` from the `ui.message` hook (or drop it if it can't reach inside a
       `Client`, and note it here).
-- [ ] Draw the legend at the bottom of the pane when there are changes.
-- [ ] Run `bun run format` and `bun run check`.
+- [x] Draw the legend at the bottom of the pane when there are changes.
+- [x] Run `bun run format` and `bun run check`.
+
+**Live check notes:** ctrl+x tab then the hotkeys works; after a click, `j`/`k` and the arrows work. After ctrl+x tab
+the arrows walk the pane's buttons, not the tree (Claude Code keeps them for the focus ring), which is accepted. Not yet
+seen live: the selected row scrolling into view in a tree longer than the pane.
 
 ## Phase 3: Jump between changed files from the diff
 
@@ -132,4 +140,4 @@ keys.
 
 ## Next step
 
-Phase 2: give the rows `Client` a cursor and handle `j`/`k`/arrows, `Enter`/`l`/`→` and `h`/`←`/`Backspace`, then the legend.
+Phase 3: in the diff, `j`/`k` open the next or previous changed file's diff, with the legend updated.

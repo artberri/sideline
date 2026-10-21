@@ -408,3 +408,121 @@ test('a truncated diff ends with a note', async ($, on) => {
 	expect((await ui.find({ type: 'Text', text: /diff truncated/, in: 'rows' }))?.text).toBe('… diff truncated')
 	await ui.unmount()
 })
+
+async function mountPane($: Engine) {
+	return $.ui.mount({ ...PANE, surface: 'terminal' })
+}
+
+// The selected row's name is drawn inverted when no background option is set.
+async function selectedOf(ui: Awaited<ReturnType<typeof mountPane>>): Promise<string | undefined> {
+	const texts = await ui.findAll({ type: 'Text', in: 'rows' })
+	return texts.find((text) => (text.props as { inverse?: boolean }).inverse === true)?.text
+}
+
+test('j/k and the arrows move the selection through the rows', async ($, on) => {
+	world(on, { status: STATUS }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await mountPane($)
+	expect(await selectedOf(ui)).toBeUndefined()
+	await ui.key({ key: 'j', in: 'rows' })
+	expect(await selectedOf(ui)).toBe('fresh.ts')
+	await ui.key({ key: 'down', in: 'rows' })
+	expect(await selectedOf(ui)).toBe('modified.ts')
+	await ui.key({ key: 'j', in: 'rows' })
+	await ui.key({ key: 'j', in: 'rows' })
+	expect(await selectedOf(ui)).toBe('staged.ts')
+	await ui.key({ key: 'k', in: 'rows' })
+	await ui.key({ key: 'up', in: 'rows' })
+	expect(await selectedOf(ui)).toBe('fresh.ts')
+	await ui.unmount()
+})
+
+test(
+	'with a background, the selected row takes the hover background',
+	{ options: { background: '#1e1e3f' } },
+	async ($, on) => {
+		world(on, { status: STATUS }, [])
+		await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+		const ui = await mountPane($)
+		await ui.key({ key: 'j', in: 'rows' })
+		expect((await ui.find({ type: 'Box', key: 'fresh.ts', in: 'rows' }))?.props).toMatchObject({
+			backgroundColor: '#393956',
+		})
+		await ui.unmount()
+	},
+)
+
+test('enter opens the selected file; h goes back with it still selected', async ($, on) => {
+	world(on, { status: STATUS, diffs: { 'modified.ts': MODIFIED_DIFF } }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await mountPane($)
+	await ui.key({ key: 'j', in: 'rows' })
+	await ui.key({ key: 'j', in: 'rows' })
+	await ui.key({ key: 'return', in: 'rows' })
+	expect((await ui.find({ type: 'Code', in: 'rows' }))?.props).toMatchObject({ path: 'modified.ts' })
+	await ui.key({ key: 'h', in: 'rows' })
+	expect(await ui.find({ type: 'Code', in: 'rows' })).toBeUndefined()
+	expect(await selectedOf(ui)).toBe('modified.ts')
+	await ui.unmount()
+})
+
+test('enter on a folder does nothing; a click on it only selects it', async ($, on) => {
+	world(on, { status: NESTED, numstat: NESTED_NUMSTAT }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await mountPane($)
+	await ui.key({ key: 'j', in: 'rows' })
+	await ui.key({ key: 'return', in: 'rows' })
+	expect(await ui.find({ type: 'Code', in: 'rows' })).toBeUndefined()
+	await ui.pointer({ type: 'down', button: 'left', x: 2, y: 2, in: 'rows' })
+	expect(await selectedOf(ui)).toBe('src/')
+	expect(await ui.find({ type: 'Code', in: 'rows' })).toBeUndefined()
+	await ui.unmount()
+})
+
+test('the selection stays on its file across a refresh, and moves to the nearest row when it leaves', async ($, on) => {
+	const w: World = { status: STATUS }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await mountPane($)
+	await ui.key({ key: 'j', in: 'rows' })
+	await ui.key({ key: 'j', in: 'rows' })
+	w.status = STATUS.replace('? fresh.ts', '? fresh.ts\0? another.ts')
+	await clock.advance(2_100)
+	expect(await selectedOf(ui)).toBe('modified.ts')
+	w.status = STATUS.replace('1 .M N... 100644 100644 100644 a a modified.ts\0', '')
+	await clock.advance(2_100)
+	expect(await selectedOf(ui)).toBe('staged.ts')
+	await ui.unmount()
+})
+
+test('a legend of hotkey buttons explains the keys while there are changes', async ($, on) => {
+	const w: World = { status: STATUS, diffs: { 'modified.ts': MODIFIED_DIFF } }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await mountPane($)
+	expect((await ui.find({ type: 'Text', text: /esc prompt/ }))?.text).toBe(
+		'click or ctrl+x tab to focus · esc prompt',
+	)
+	const keys = async () => (await ui.findAll({ type: 'Button' })).map((button) => button.props.hotkey).filter(Boolean)
+	expect(await keys()).toEqual(['j', 'k', 'l'])
+	await ui.post({ press: 'modified.ts', kind: 'file' }, { in: 'rows' })
+	expect(await keys()).toEqual(['h'])
+	await ui.unmount()
+	w.status = ['# branch.oid 0123456789abcdef', '# branch.head main', ''].join('\0')
+	await clock.advance(2_100)
+	expect(await drawn($, 'terminal')).not.toContain('esc prompt')
+})
+
+test('the legend hotkeys drive the same selection as the tree keys', async ($, on) => {
+	world(on, { status: STATUS, diffs: { 'modified.ts': MODIFIED_DIFF } }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await mountPane($)
+	await ui.press({ key: 'nav-j' })
+	await ui.key({ key: 'j', in: 'rows' })
+	expect(await selectedOf(ui)).toBe('modified.ts')
+	await ui.press({ key: 'nav-l' })
+	expect((await ui.find({ type: 'Code', in: 'rows' }))?.props).toMatchObject({ path: 'modified.ts' })
+	await ui.press({ key: 'nav-h' })
+	expect(await selectedOf(ui)).toBe('modified.ts')
+	await ui.unmount()
+})

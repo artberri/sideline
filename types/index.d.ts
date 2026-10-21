@@ -37,6 +37,9 @@ export type ActiveEdit = { id: string; path: string; state: 'running' | 'done'; 
 // The open file's diff against HEAD: unified hunks, or empty for a binary file.
 export type FileDiff = { path: string; hunks: string }
 
+// The selected row: its id, and its index so the selection can fall to the nearest row when it leaves the tree.
+export type Cursor = { id: string; index: number }
+
 declare module 'claude-code' {
 	interface PluginState {
 		vacuo: {
@@ -45,6 +48,7 @@ declare module 'claude-code' {
 			edits: ActiveEdit[]
 			selected: string | null
 			diff: FileDiff | null
+			cursor: Cursor | null
 		}
 	}
 }

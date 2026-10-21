@@ -1,4 +1,4 @@
-import type { ChangedFile, FileStatus } from '../types'
+import type { ChangedFile, Cursor, FileStatus } from '../types'
 
 export type TreeRow = {
 	id: string
@@ -80,4 +80,11 @@ export function treeRows(files: ChangedFile[]): TreeRow[] {
 	const rows: TreeRow[] = []
 	emit(root, '', 0, rows)
 	return rows
+}
+
+// The selected row's index: its id's row, or the row now at its old index when it left; -1 with nothing selected.
+export function resolveCursor(rows: readonly { id: string }[], cursor: Cursor | null): number {
+	if (cursor === null || rows.length === 0) return -1
+	const index = rows.findIndex((row) => row.id === cursor.id)
+	return index >= 0 ? index : Math.min(cursor.index, rows.length - 1)
 }

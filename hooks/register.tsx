@@ -1,14 +1,15 @@
 import { atom, read, update } from 'claude-code'
 import type { Color, EngineInterface, Register } from 'claude-code'
 
-import type { ActiveEdit, ChangedFile, FileDiff, FileStatus, Snapshot } from '../types'
+import type { ActiveEdit, ChangedFile, Cursor, FileDiff, FileStatus, Snapshot } from '../types'
 import { readDiff, readSnapshot } from './git'
 import { rowIcon } from './icons'
 import { cutDiff, drawDiff, drawRows } from './rows'
 import type { RowSpec } from './rows'
 import { bashChangedFiles, countsLabel, summarize } from './summary'
 import { BRANCH_ICON, backgroundOption, lighten, resolveGlyphs, statusSymbols } from './symbols'
-import { treeRows } from './tree'
+import { resolveCursor, treeRows } from './tree'
+import type { TreeRow } from './tree'
 
 const PANE = 'vacuo'
 const TITLE = 'Changes'
@@ -19,12 +20,18 @@ const FLASH_MS = 100
 const MIN_SHIMMER_MS = 1_200
 // Claude Code's own result gutter, which a row drawn in place of a ToolResult does not get.
 const RESULT_GUTTER = '  ⎿  '
+const FOCUS_HINT = 'click or ctrl+x tab to focus · esc prompt'
+const DOWN = new Set(['j', 'down'])
+const UP = new Set(['k', 'up'])
+const OPEN = new Set(['l', 'right', 'return'])
+const BACK = new Set(['h', 'left', 'backspace'])
 
 const snapshot = atom({ plugin: 'vacuo', key: 'snapshot' } as const, { kind: 'loading' } as Snapshot)
 const glyphs = atom({ plugin: 'vacuo', key: 'glyphs' } as const, 'plain')
 const edits = atom({ plugin: 'vacuo', key: 'edits' } as const, [] as ActiveEdit[])
 const selected = atom({ plugin: 'vacuo', key: 'selected' } as const, null as string | null)
 const diff = atom({ plugin: 'vacuo', key: 'diff' } as const, null as FileDiff | null)
+const cursor = atom({ plugin: 'vacuo', key: 'cursor' } as const, null as Cursor | null)
 
 const STATUS_COLOR: Record<FileStatus, Color> = {
 	added: 'success',
@@ -103,6 +110,57 @@ function withEditedFiles(files: ChangedFile[], edited: Map<string, ActiveEdit>):
 	return [...files, ...extra]
 }
 
+// The tree as the pane draws it, with the files Claude is editing; null outside a repo.
+async function currentTree($: EngineInterface): Promise<{ rows: TreeRow[]; edited: Map<string, ActiveEdit> } | null> {
+	const shown = await read($, snapshot)
+	if (shown.kind !== 'repo') return null
+	const root = `${shown.root}/`
+	const edited = new Map(
+		(await read($, edits))
+			.filter((edit) => edit.path.startsWith(root))
+			.map((edit) => [edit.path.slice(root.length), edit]),
+	)
+	return { rows: treeRows(withEditedFiles(shown.files, edited)), edited }
+}
+
+async function openFile($: EngineInterface, path: string): Promise<void> {
+	await update($, selected, () => path)
+	await refresh($)
+}
+
+async function select($: EngineInterface, id: string, index: number): Promise<void> {
+	await update($, cursor, () => ({ id, index }))
+	await $.ui.scroll({ to: { key: id }, in: PANE }).catch(() => undefined)
+}
+
+// One key, from the rows Client or a legend hotkey: moves the selection, opens its file, or closes the diff.
+async function navigate($: EngineInterface, key: string): Promise<void> {
+	if ((await read($, selected)) !== null) {
+		if (BACK.has(key)) await closeDiff($)
+		return
+	}
+	const tree = await currentTree($)
+	if (!tree || tree.rows.length === 0) return
+	const at = resolveCursor(tree.rows, await read($, cursor))
+	const last = tree.rows.length - 1
+	if (OPEN.has(key)) {
+		const row = tree.rows[at]
+		if (row?.kind === 'file') await openFile($, row.id)
+		return
+	}
+	const index = DOWN.has(key)
+		? at < 0
+			? 0
+			: Math.min(at + 1, last)
+		: UP.has(key)
+			? at < 0
+				? 0
+				: Math.max(at - 1, 0)
+			: -1
+	const row = tree.rows[index]
+	if (row) await select($, row.id, index)
+}
+
 // Turns a finished edit into the flash once it has shimmered for MIN_SHIMMER_MS, then clears it.
 async function finishEdit($: EngineInterface, id: string, startedAt: number): Promise<void> {
 	const flash = () => {
@@ -163,15 +221,12 @@ export const register: Register = (on, options) => {
 	on('ui.message', { requestId: PANE, element: 'rows' }, async ($, e) => {
 		const data = e.data
 		if (typeof data !== 'object' || data === null) return {}
-		if ('back' in data) {
-			await closeDiff($)
-			return {}
+		if ('back' in data) await closeDiff($)
+		else if ('key' in data && typeof data.key === 'string') await navigate($, data.key)
+		else if ('press' in data && typeof data.press === 'string') {
+			await select($, data.press, 'index' in data && typeof data.index === 'number' ? data.index : 0)
+			if ('kind' in data && data.kind === 'file') await openFile($, data.press)
 		}
-		if (!('press' in data) || !('kind' in data)) return {}
-		if (data.kind !== 'file' || typeof data.press !== 'string') return {}
-		const path = data.press
-		await update($, selected, () => path)
-		await refresh($)
 		return {}
 	})
 
@@ -217,17 +272,16 @@ export const register: Register = (on, options) => {
 		if (shown.kind === 'loading') return fill(<Text> </Text>)
 		if (shown.kind === 'none') return fill(<Text dimColor>not a git repo</Text>)
 		const symbols = statusSymbols(shown.status)
-		const root = `${shown.root}/`
-		const edited = new Map(
-			(await read($, edits))
-				.filter((edit) => edit.path.startsWith(root))
-				.map((edit) => [edit.path.slice(root.length), edit]),
-		)
+		const tree = await currentTree($)
+		const edited = tree?.edited ?? new Map<string, ActiveEdit>()
+		const treeRowsShown = tree?.rows ?? []
 		const openPath = await read($, selected)
 		const openDiff = await read($, diff)
 		const opened = openPath !== null && openDiff?.path === openPath ? openDiff : null
 		const diffView = opened ? { path: opened.path, ...cutDiff(opened.hunks) } : null
-		const rows = treeRows(withEditedFiles(shown.files, edited)).map((row): RowSpec => ({
+		const at = resolveCursor(treeRowsShown, await read($, cursor))
+		const cursorId = treeRowsShown[at]?.id ?? null
+		const rows = treeRowsShown.map((row): RowSpec => ({
 			id: row.id,
 			kind: row.kind,
 			indent: '  '.repeat(row.depth),
@@ -241,7 +295,7 @@ export const register: Register = (on, options) => {
 			isBinary: row.isBinary,
 		}))
 		return fill(
-			<Box flexDirection="column">
+			<Box flexDirection="column" flexGrow={1}>
 				<Text>
 					<Text color="magenta" bold>{`${icon} ${shown.branch}`}</Text>
 					{symbols && <Text color="red" bold>{` [${symbols}]`}</Text>}
@@ -253,14 +307,64 @@ export const register: Register = (on, options) => {
 						<elements.Client
 							key="rows"
 							module="./rows.tsx"
-							props={{ rows, hoverBackground, diff: diffView }}
+							props={{ rows, hoverBackground, diff: diffView, cursor: cursorId }}
 						/>
 					) : diffView ? (
 						drawDiff(diffView, elements, () => void closeDiff($))
 					) : (
-						drawRows({ rows, hoverBackground }, elements, 0)
+						drawRows({ rows, hoverBackground }, elements, 0, -1, cursorId)
 					)}
 				</Box>
+				{(rows.length > 0 || diffView) && (
+					<Box flexGrow={1} flexDirection="column" justifyContent="flex-end" marginTop={1}>
+						<Box flexDirection="row">
+							{diffView ? (
+								<elements.Button
+									key="nav-h"
+									plain
+									dimColor
+									autoFocus
+									hotkey="h"
+									label="back"
+									onPress={() => navigate($, 'h')}
+								/>
+							) : (
+								<Box flexDirection="row">
+									<elements.Button
+										key="nav-j"
+										plain
+										dimColor
+										hotkey="j"
+										label="down"
+										onPress={() => navigate($, 'j')}
+									/>
+									<Text> </Text>
+									<elements.Button
+										key="nav-k"
+										plain
+										dimColor
+										hotkey="k"
+										label="up"
+										onPress={() => navigate($, 'k')}
+									/>
+									<Text> </Text>
+									<elements.Button
+										key="nav-l"
+										plain
+										dimColor
+										autoFocus
+										hotkey="l"
+										label="open"
+										onPress={() => navigate($, 'l')}
+									/>
+								</Box>
+							)}
+						</Box>
+						<Text dimColor wrap="wrap">
+							{FOCUS_HINT}
+						</Text>
+					</Box>
+				)}
 			</Box>,
 		)
 	})

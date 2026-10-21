@@ -17,7 +17,12 @@ export type RowSpec = {
 // The open file's diff as the rows Client draws it, cut to fit a Client's props.
 export type DiffView = { path: string; hunks: string; isTruncated: boolean }
 
-export type RowsProps = { rows: RowSpec[]; hoverBackground: string | null; diff: DiffView | null }
+export type RowsProps = {
+	rows: RowSpec[]
+	hoverBackground: string | null
+	diff: DiffView | null
+	cursor: string | null
+}
 
 type Local = { phase: number; hovered: number; stop?: () => void }
 
@@ -68,8 +73,10 @@ export function drawRows(
 	{ Box, Text }: Pick<ClientElements, 'Box' | 'Text'>,
 	phase: number,
 	hovered = -1,
+	cursor: string | null = null,
 ) {
 	const isHovered = (row: RowSpec) => row.kind === 'file' && rows[hovered]?.id === row.id
+	const isSelected = (row: RowSpec) => row.id === cursor
 	const name = (row: RowSpec) => {
 		if (row.lit === 'done') {
 			return (
@@ -97,7 +104,7 @@ export function drawRows(
 			)
 		}
 		return (
-			<Text strikethrough={row.isStruck} underline={isHovered(row)}>
+			<Text strikethrough={row.isStruck} underline={isHovered(row)} inverse={isSelected(row) && !hoverBackground}>
 				{row.name}
 			</Text>
 		)
@@ -109,7 +116,9 @@ export function drawRows(
 				<Box
 					key={row.id}
 					flexDirection="row"
-					backgroundColor={isHovered(row) && hoverBackground ? hoverBackground : undefined}
+					backgroundColor={
+						(isHovered(row) || isSelected(row)) && hoverBackground ? hoverBackground : undefined
+					}
 				>
 					<Box flexGrow={1} flexShrink={1} overflow="hidden">
 						<Text wrap="truncate-end">
@@ -135,6 +144,8 @@ export function drawRows(
 }
 
 // The animated rows: a Client owns the frame timer, so the shimmer never makes the pane's hook redraw.
+// The animated rows: a Client owns the frame timer, so the shimmer never makes the pane's hook redraw.
+// Keys and clicks go to the hooks module, which owns the selection, so the legend's hotkeys move the same one.
 export const Rows: ClientModule<RowsProps, Local> = (props, surface) => {
 	const state = surface.state ?? { phase: 0, hovered: -1 }
 	const isRunning = props.rows.some((row) => row.lit === 'running')
@@ -146,10 +157,9 @@ export const Rows: ClientModule<RowsProps, Local> = (props, surface) => {
 		surface.setState({ ...state, stop })
 	} else if (!isRunning && state.stop) {
 		state.stop()
-		surface.setState({ phase: 0, hovered: state.hovered })
+		surface.setState({ ...state, phase: 0, stop: undefined })
 	}
-	// Registered in both views so a click hands the Client the keyboard; the keys themselves come in a later phase.
-	surface.onKey(() => undefined)
+	surface.onKey((event) => surface.post({ key: event.key }))
 	if (props.diff) {
 		surface.onPointer(() => undefined)
 		return drawDiff(props.diff, surface.elements, () => surface.post({ back: true }))
@@ -160,7 +170,7 @@ export const Rows: ClientModule<RowsProps, Local> = (props, surface) => {
 		if (hovered !== current.hovered) surface.setState({ ...current, hovered })
 		if (event.type !== 'down' || (event.button ?? 'left') !== 'left') return
 		const row = props.rows[event.y]
-		if (row) surface.post({ press: row.id, kind: row.kind })
+		if (row) surface.post({ press: row.id, kind: row.kind, index: event.y })
 	})
-	return drawRows(props, surface.elements, state.phase, state.hovered)
+	return drawRows(props, surface.elements, state.phase, state.hovered, props.cursor)
 }
