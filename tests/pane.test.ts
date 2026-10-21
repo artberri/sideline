@@ -9,6 +9,8 @@ type World = {
 	hasStash?: boolean
 	hasNerdFont?: boolean
 	tool?: () => unknown
+	diffs?: Record<string, string>
+	ran?: string[][]
 }
 
 const PANE = {
@@ -53,6 +55,8 @@ function world(on: On, w: World, opens: string[]) {
 		if (argv.includes('status')) return w.status === undefined ? done(128) : done(0, w.status)
 		if (argv.includes('refs/stash')) return done(w.hasStash ? 0 : 1)
 		if (argv.includes('--show-toplevel')) return done(0, '/repo\n')
+		w.ran?.push(argv)
+		if (argv.includes('diff') && !argv.includes('--numstat')) return done(0, w.diffs?.[argv.at(-1) ?? ''] ?? '')
 		if (argv.includes('--no-index')) return done(1, w.untracked?.[argv.at(-1) ?? ''] ?? '')
 		if (argv.includes('diff')) return done(0, w.numstat ?? '')
 		return done(0)
@@ -271,4 +275,67 @@ test('the shimmer moves across the name on the frame clock', async ($, on) => {
 	await ui.unmount()
 	finish({ result: {} })
 	await call
+})
+
+const MODIFIED_DIFF =
+	'diff --git a/modified.ts b/modified.ts\nindex 1..2 100644\n--- a/modified.ts\n+++ b/modified.ts\n@@ -1 +1 @@\n-old\n+new\n'
+
+async function openFile($: Engine, path: string, kind: 'file' | 'dir' = 'file') {
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	await ui.post({ press: path, kind }, { in: 'rows' })
+	return ui
+}
+
+test('clicking a file opens its diff against HEAD, without git headers', async ($, on) => {
+	world(on, { status: STATUS, diffs: { 'modified.ts': MODIFIED_DIFF } }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await openFile($, 'modified.ts')
+	const code = await ui.find({ type: 'Code' })
+	expect(code?.props).toMatchObject({ source: '@@ -1 +1 @@\n-old\n+new\n', format: 'diff', path: 'modified.ts' })
+	expect(await ui.find({ type: 'Button', key: 'back' })).toBeDefined()
+	await ui.unmount()
+})
+
+test('clicking a folder does nothing', async ($, on) => {
+	world(on, { status: NESTED, numstat: NESTED_NUMSTAT }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await openFile($, 'src/', 'dir')
+	expect(await ui.find({ type: 'Code' })).toBeUndefined()
+	await ui.unmount()
+})
+
+test('an untracked file shows its diff against /dev/null', async ($, on) => {
+	const ran: string[][] = []
+	world(on, { status: STATUS, diffs: { 'fresh.ts': '@@ -0,0 +1 @@\n+hello\n' }, ran }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await openFile($, 'fresh.ts')
+	expect((await ui.find({ type: 'Code' }))?.props).toMatchObject({ source: '@@ -0,0 +1 @@\n+hello\n' })
+	expect(
+		ran.some((argv) => argv.includes('--no-index') && !argv.includes('--numstat') && argv.at(-1) === 'fresh.ts'),
+	).toBe(true)
+	await ui.unmount()
+})
+
+test('the back button returns to the tree', async ($, on) => {
+	world(on, { status: STATUS, diffs: { 'modified.ts': MODIFIED_DIFF } }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await openFile($, 'modified.ts')
+	await ui.press({ key: 'back' })
+	expect(await ui.find({ type: 'Code' })).toBeUndefined()
+	await ui.unmount()
+	expect(await drawn($, 'terminal')).toContain('modified.ts')
+})
+
+test('the open diff follows the file and closes once it is no longer changed', async ($, on) => {
+	const w: World = { status: STATUS, diffs: { 'modified.ts': MODIFIED_DIFF } }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await openFile($, 'modified.ts')
+	w.diffs = { 'modified.ts': '@@ -1 +1,2 @@\n-old\n+new\n+more\n' }
+	await clock.advance(2_100)
+	expect((await ui.find({ type: 'Code' }))?.props).toMatchObject({ source: '@@ -1 +1,2 @@\n-old\n+new\n+more\n' })
+	w.status = STATUS.replace('1 .M N... 100644 100644 100644 a a modified.ts\0', '')
+	await clock.advance(2_100)
+	expect(await ui.find({ type: 'Code' })).toBeUndefined()
+	await ui.unmount()
 })

@@ -1,8 +1,8 @@
 import { atom, read, update } from 'claude-code'
 import type { Color, EngineInterface, Register } from 'claude-code'
 
-import type { ActiveEdit, ChangedFile, FileStatus, Snapshot } from '../types'
-import { readSnapshot } from './git'
+import type { ActiveEdit, ChangedFile, FileDiff, FileStatus, Snapshot } from '../types'
+import { readDiff, readSnapshot } from './git'
 import { rowIcon } from './icons'
 import { drawRows } from './rows'
 import type { RowSpec } from './rows'
@@ -21,6 +21,8 @@ const RESULT_GUTTER = '  ⎿  '
 const snapshot = atom({ plugin: 'vacuo', key: 'snapshot' } as const, { kind: 'loading' } as Snapshot)
 const glyphs = atom({ plugin: 'vacuo', key: 'glyphs' } as const, 'plain')
 const edits = atom({ plugin: 'vacuo', key: 'edits' } as const, [] as ActiveEdit[])
+const selected = atom({ plugin: 'vacuo', key: 'selected' } as const, null as string | null)
+const diff = atom({ plugin: 'vacuo', key: 'diff' } as const, null as FileDiff | null)
 
 const STATUS_COLOR: Record<FileStatus, Color> = {
 	added: 'success',
@@ -37,6 +39,26 @@ async function readAndStore($: EngineInterface): Promise<void> {
 	const next = await readSnapshot($, await $.session.cwd())
 	const current = await read($, snapshot)
 	if (JSON.stringify(current) !== JSON.stringify(next)) await update($, snapshot, () => next)
+	await readSelectedDiff($, next)
+}
+
+async function closeDiff($: EngineInterface): Promise<void> {
+	await update($, selected, () => null)
+	await update($, diff, () => null)
+}
+
+// The open diff follows its file, and closes once the file is no longer changed.
+async function readSelectedDiff($: EngineInterface, shown: Snapshot): Promise<void> {
+	const path = await read($, selected)
+	if (path === null) return
+	const file = shown.kind === 'repo' ? shown.files.find((one) => one.path === path) : undefined
+	if (!file || shown.kind !== 'repo') {
+		await closeDiff($)
+		return
+	}
+	const next: FileDiff = { path, hunks: await readDiff($, shown.root, file) }
+	const current = await read($, diff)
+	if (JSON.stringify(current) !== JSON.stringify(next)) await update($, diff, () => next)
 }
 
 // The poll and tool calls overlap; one read runs at a time, and a request during it runs once more afterwards.
@@ -119,6 +141,16 @@ export const register: Register = (on, options) => {
 		return result
 	})
 
+	on('ui.message', { requestId: PANE, element: 'rows' }, async ($, e) => {
+		const data = e.data
+		if (typeof data !== 'object' || data === null || !('press' in data) || !('kind' in data)) return {}
+		if (data.kind !== 'file' || typeof data.press !== 'string') return {}
+		const path = data.press
+		await update($, selected, () => path)
+		await refresh($)
+		return {}
+	})
+
 	on('ui.render', { component: 'ToolResult' }, async ($, e, next) => {
 		if (!isHidingDiffs || e.props.isExpanded === true || e.props.isErrored) return next(e)
 		const summaries = summarize(e.props.tool, e.props.output, await $.session.cwd())
@@ -167,8 +199,12 @@ export const register: Register = (on, options) => {
 				.filter((edit) => edit.path.startsWith(root))
 				.map((edit) => [edit.path.slice(root.length), edit]),
 		)
+		const openPath = await read($, selected)
+		const openDiff = await read($, diff)
+		const opened = openPath !== null && openDiff?.path === openPath ? openDiff : null
 		const rows = treeRows(withEditedFiles(shown.files, edited)).map((row): RowSpec => ({
 			id: row.id,
+			kind: row.kind,
 			indent: '  '.repeat(row.depth),
 			icon: rowIcon(row.kind, row.name, glyphSet),
 			iconColor: row.status ? STATUS_COLOR[row.status] : null,
@@ -185,15 +221,36 @@ export const register: Register = (on, options) => {
 					<Text color="magenta" bold>{`${icon} ${shown.branch}`}</Text>
 					{symbols && <Text color="red" bold>{` [${symbols}]`}</Text>}
 				</Text>
-				<Box flexDirection="column" marginTop={1}>
-					{rows.length === 0 ? (
-						<Text dimColor>no changes</Text>
-					) : 'Client' in elements ? (
-						<elements.Client key="rows" module="./rows.tsx" props={{ rows }} />
-					) : (
-						drawRows(rows, elements, 0)
-					)}
-				</Box>
+				{opened ? (
+					<Box flexDirection="column" marginTop={1}>
+						<Box flexDirection="row">
+							<elements.Button key="back" plain label="← files" onPress={() => closeDiff($)} />
+							<Text bold>{`  ${opened.path}`}</Text>
+						</Box>
+						<Box marginTop={1}>
+							{opened.hunks === '' ? (
+								<Text dimColor>no text diff (binary file)</Text>
+							) : (
+								<elements.Code
+									source={opened.hunks}
+									path={opened.path}
+									format="diff"
+									wrap="truncate-end"
+								/>
+							)}
+						</Box>
+					</Box>
+				) : (
+					<Box flexDirection="column" marginTop={1}>
+						{rows.length === 0 ? (
+							<Text dimColor>no changes</Text>
+						) : 'Client' in elements ? (
+							<elements.Client key="rows" module="./rows.tsx" props={{ rows }} />
+						) : (
+							drawRows(rows, elements, 0)
+						)}
+					</Box>
+				)}
 			</Box>,
 		)
 	})

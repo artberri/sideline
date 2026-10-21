@@ -2,6 +2,7 @@ import type { ClientElements, ClientModule, Color } from 'claude-code'
 
 export type RowSpec = {
 	id: string
+	kind: 'dir' | 'file'
 	indent: string
 	icon: string
 	iconColor: Color | null
@@ -97,5 +98,10 @@ export const Rows: ClientModule<RowsProps, Local> = (props, surface) => {
 		state.stop()
 		surface.setState({ phase: 0 })
 	}
+	surface.onPointer((event) => {
+		if (event.type !== 'down' || (event.button ?? 'left') !== 'left') return
+		const row = props.rows[event.y]
+		if (row) surface.post({ press: row.id, kind: row.kind })
+	})
 	return drawRows(props.rows, surface.elements, state.phase)
 }

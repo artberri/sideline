@@ -129,3 +129,17 @@ export async function readSnapshot($: EngineInterface, cwd: string): Promise<Sna
 	snapshot.files = snapshot.files.map((file) => ({ ...file, ...counts.get(file.path) }))
 	return snapshot
 }
+
+// Drops git's file header (`diff --git`, `index`, `---`, `+++`), keeping the hunks from the first `@@`.
+export function hunksOnly(diff: string): string {
+	const start = diff.startsWith('@@') ? 0 : diff.indexOf('\n@@') + 1
+	return start > 0 || diff.startsWith('@@') ? diff.slice(start) : ''
+}
+
+export async function readDiff($: EngineInterface, root: string, file: ChangedFile): Promise<string> {
+	const args = file.isUntracked
+		? ['diff', '--no-index', '--', '/dev/null', file.path]
+		: ['diff', 'HEAD', '--', file.path]
+	const run = await git($, root, args)
+	return hunksOnly(run.stdout)
+}

@@ -14,11 +14,11 @@ edited the file.
 - **B3.** The ctrl+o view still shows the full diffs. — _proved by:_ `tests/transcript.test.tsx` › ctrl+o shows the engine diff
 - **B4.** With the `transcriptDiffs` option set to `show`, the conversation shows the diffs as before. — _proved by:_ `tests/transcript.test.tsx` › transcriptDiffs: show keeps the engine diff
 - **B5.** Clicking a file in the pane replaces the tree with that file's diff against `HEAD`; an untracked file shows
-  as all added, a deleted file as all removed. — _proved by:_
-- **B6.** A `← files` button above the diff goes back to the tree. — _proved by:_
+  as all added, a deleted file as all removed. — _proved by:_ `tests/pane.test.ts` › clicking a file opens its diff against HEAD, without git headers; an untracked file shows its diff against /dev/null
+- **B6.** A `← files` button above the diff goes back to the tree. — _proved by:_ `tests/pane.test.ts` › the back button returns to the tree
 - **B7.** The open diff follows the file: it updates when the file changes, and the pane goes back to the tree once the
-  file is no longer changed (after a commit, say). — _proved by:_
-- **B8.** Clicking a folder does nothing. — _proved by:_
+  file is no longer changed (after a commit, say). — _proved by:_ `tests/pane.test.ts` › the open diff follows the file and closes once it is no longer changed
+- **B8.** Clicking a folder does nothing. — _proved by:_ `tests/pane.test.ts` › clicking a folder does nothing
 
 ## Context
 
@@ -31,6 +31,9 @@ edited the file.
 - **vacuo draws Claude Code's `  ⎿  ` result gutter** before every summary line, since a row drawn in place of a
   `ToolResult` loses the engine's own; one per file, like a Web Search result's lines.
 - **ctrl+o keeps the engine's full result:** the `ToolResult` hook passes through when `isExpanded` is true.
+- **The diff shows hunks only:** git's file header (`diff --git`, `index`, `---`, `+++`) is dropped, since the pane
+  already shows the path, and a `Code` in `format="diff"` reads hunks.
+- **Mobile and VS Code can't click rows yet:** they draw the tree without the `Client`, so there is no pointer there.
 - **Keyboard navigation is a follow-up** (see below): it needs a selected row in the tree first.
 
 ### Engine API (checked in the 2.1.306 typings)
@@ -93,21 +96,21 @@ tree.
 
 **Test Checklist:**
 
-- [ ] Pane test (B5, B8): a posted press on a file opens its diff; on a folder it does nothing.
-- [ ] Pane test (B5): an untracked file's diff comes from `--no-index`.
-- [ ] Pane test (B6): pressing `← files` goes back to the tree.
-- [ ] Pane test (B7): a refresh redraws the diff; a file that leaves the tree closes the diff view.
+- [x] Pane test (B5, B8): a posted press on a file opens its diff; on a folder it does nothing.
+- [x] Pane test (B5): an untracked file's diff comes from `--no-index`.
+- [x] Pane test (B6): pressing `← files` goes back to the tree.
+- [x] Pane test (B7): a refresh redraws the diff; a file that leaves the tree closes the diff view.
 - [ ] Manual, live session (B5): clicking a row opens its diff. The kit posts the message; only a real pointer proves
       the click lands on the right row.
 
 **To-do:**
 
-- [ ] Add `selected` to the state contract.
-- [ ] In `hooks/rows.tsx`: an `onPointer` listener that posts the clicked row's id on a left press.
-- [ ] Handle `ui.message` from the rows `Client` and set `selected` for files.
-- [ ] Read the selected file's diff in `hooks/git.ts` (tracked and untracked), refreshed with the snapshot.
-- [ ] Draw the diff view: `← files` button, path, `Code format="diff"`.
-- [ ] Run `bun run format` and `bun run check`.
+- [x] Add `selected` to the state contract.
+- [x] In `hooks/rows.tsx`: an `onPointer` listener that posts the clicked row's id on a left press.
+- [x] Handle `ui.message` from the rows `Client` and set `selected` for files.
+- [x] Read the selected file's diff in `hooks/git.ts` (tracked and untracked), refreshed with the snapshot.
+- [x] Draw the diff view: `← files` button, path, `Code format="diff"`.
+- [x] Run `bun run format` and `bun run check`.
 
 ## Follow-ups
 
@@ -116,4 +119,4 @@ tree.
 
 ## Next step
 
-Phase 2: post the clicked row from the rows `Client`, then open the file's diff in the pane.
+Phase 2: click a file in a live session (the manual test), then mark the phase ✅ and archive the plan.
