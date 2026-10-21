@@ -47,13 +47,18 @@ Work through the phase's to-dos in order.
       proves (test file and title), mark the phase title ✅ only when every to-do is ticked, and update `Next step`.
 - [ ] Stage the plan with the code, by explicit path.
 
+**Live check first, commit after.** When the change is something the user checks in the pane (any phase with a manual
+check, or a fix for something they reported), stop with it uncommitted, say exactly what to try, and commit only once
+they confirm it works or say "commit". Tests-only or docs-only changes can be committed directly.
+
 Commit small, one topic each, with conventional commit subjects (`feat: draw the branch header`). Check that
 `git config user.email` is the personal address, never commit with `-q`, and if GPG signing fails, stop and tell the
 user. Never pass `--no-gpg-sign`. Don't push unless asked.
 
 ## Step 4: End of the phase
 
-1. Summarize: commits, what the user should now see in the pane, any deviation from the plan.
+1. Summarize: what changed (uncommitted, waiting on the live check), what the user should now see in the pane, any
+   deviation from the plan.
 2. List follow-ups and anything that surprised you.
 3. **Ask whether to go on to the next phase.** Don't continue on your own.
 
