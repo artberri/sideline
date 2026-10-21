@@ -13,6 +13,12 @@ here (or move it into the plan) once it is planned.
   _From: the keyboard-navigation plan._
 - **Clicks and keys on mobile and VS Code.** Those surfaces have no `Client`, so the tree can't be clicked or driven by
   keys there; it draws, but without interaction. _From: the transcript-diffs and keyboard-navigation plans._
+- **Write a `README.md`.** `claude plugin validate` reports a missing README as the one problem left for submitting
+  the mod to the plugin directory (the license is in place); it should say what the mod does, how to install it and its
+  options (`glyphs`, `background`, `transcriptDiffs`). _From: the validator's output since the scaffold._
+- **Check the file icons on a real Nerd Font.** The table in `hooks/icons.ts` was built from nerd-fonts'
+  `glyphnames.json` but never reviewed in the pane; swap any glyph that draws as a box or a blank. _From: adding the
+  file-type icons._
 
 ## Ideas
 
