@@ -34,14 +34,18 @@ in the transcript; `claude --debug` has the full log.
   element at hand (`'tool.call'`, `Pane: {`, `every:`); never read it whole, and never guess a shape.
 - No DOM, no Node: everything outside the module goes through `$` (`$.process.run`, `$.clock`, `$.state`, `$.ui`).
 
+## Tooling
+
+Bun is pinned with proto in `.prototools`; `proto use` installs it, then `bun install`. `package.json` holds dev tools
+only (oxlint, oxfmt, TypeScript): the mod itself has no dependencies and no build step.
+
 ## Checks
 
-Run all three before each commit:
+Run before each commit:
 
 ```sh
-claude plugin validate .
-tsc -p .
-claude plugin test .
+bun run format      # oxfmt, writes
+bun run check       # oxfmt --check, oxlint, tsc -p ., claude plugin validate ., claude plugin test .
 ```
 
 `tsc -p .` needs the generated typings, so the mod must have loaded once.

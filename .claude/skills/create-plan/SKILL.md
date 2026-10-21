@@ -70,8 +70,7 @@ one you expect.
 Before writing the file, walk the user through your proposed phases. Each phase should be a **vertical slice**:
 
 - It ends with something the user can see in a running session (hot reload), plus the tests that pin it.
-- It's independently committable: `claude plugin validate .` passes, `tsc -p .` is clean, `claude plugin test .` is
-  green.
+- It's independently committable: `bun run check` is green (format, lint, types, plugin validation, tests).
 - It touches a handful of files, so review stays manageable.
 - It has a single responsibility. Drawing data and gathering it can share a phase; a new interaction (keys, clicks) is
   its own phase.
@@ -138,8 +137,8 @@ each rule's proving test as it goes.>
 
 ### Key files
 
-| Area | Files                                      |
-| ---- | ------------------------------------------ |
+| Area | Files                                          |
+| ---- | ---------------------------------------------- |
 | ...  | [hooks/register.tsx](../../hooks/register.tsx) |
 
 ### Contracts
@@ -166,7 +165,7 @@ each rule's proving test as it goes.>
 **To-do:**
 
 - [ ] <Concrete action>
-- [ ] Run `claude plugin validate .`, `tsc -p .` and `claude plugin test .`
+- [ ] Run `bun run format` and `bun run check`
 
 ## Phase 2: <Short phase title>
 

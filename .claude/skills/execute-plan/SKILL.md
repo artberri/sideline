@@ -41,9 +41,8 @@ Work through the phase's to-dos in order.
 
 ## Step 3: Before each commit
 
-- [ ] `claude plugin validate .`
-- [ ] `tsc -p .` (needs the generated typings, so the mod must have loaded once)
-- [ ] `claude plugin test .`
+- [ ] `bun run format`, then `bun run check` (oxfmt check, oxlint, `tsc -p .`, `claude plugin validate .`,
+      `claude plugin test .`; `tsc` needs the generated typings, so the mod must have loaded once)
 - [ ] Update the plan: tick the to-dos this commit finishes, fill in _proved by:_ for each behaviour rule a test now
       proves (test file and title), mark the phase title ✅ only when every to-do is ticked, and update `Next step`.
 - [ ] Stage the plan with the code, by explicit path.

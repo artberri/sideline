@@ -48,22 +48,22 @@ runs. A smaller, focused take on [claude-code-filetree](https://github.com/data-
 
 Clone into the scratchpad for reference; never copy it into this repo wholesale.
 
-| What | Where in filetree | Notes |
-| --- | --- | --- |
-| Running git without taking locks | `hooks/register.tsx`, `git()` | `--no-optional-locks` and `GIT_OPTIONAL_LOCKS=0`, so the poll never blocks Claude's own git commands |
-| Numstat parsing | `hooks/register.tsx`, `parseNumstat` | We read `git diff HEAD --numstat -z` the same way |
-| Edit/Write hook shape | `hooks/register.tsx`, the `tool.call` hook | It marks the file *after* `next(e)`. We mark it *before* (B10) and flash after (B11) |
-| Shimmer animation | `hooks/rows.tsx`, `shimmer()` and `surface.every` | A `Client` module owns the frame timer so the pane hook doesn't redraw every tick |
-| Tone palettes | `hooks/git.ts`, `TONES` | Only the `orange` tone is needed |
+| What                             | Where in filetree                                 | Notes                                                                                                |
+| -------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Running git without taking locks | `hooks/register.tsx`, `git()`                     | `--no-optional-locks` and `GIT_OPTIONAL_LOCKS=0`, so the poll never blocks Claude's own git commands |
+| Numstat parsing                  | `hooks/register.tsx`, `parseNumstat`              | We read `git diff HEAD --numstat -z` the same way                                                    |
+| Edit/Write hook shape            | `hooks/register.tsx`, the `tool.call` hook        | It marks the file _after_ `next(e)`. We mark it _before_ (B10) and flash after (B11)                 |
+| Shimmer animation                | `hooks/rows.tsx`, `shimmer()` and `surface.every` | A `Client` module owns the frame timer so the pane hook doesn't redraw every tick                    |
+| Tone palettes                    | `hooks/git.ts`, `TONES`                           | Only the `orange` tone is needed                                                                     |
 
 ### Key files
 
-| Area | Files |
-| --- | --- |
-| Hooks module | [hooks/register.tsx](../../hooks/register.tsx) |
-| Manifest and options | [.claude-plugin/plugin.json](../../.claude-plugin/plugin.json) |
-| State contract | `types/index.d.ts` (new) |
-| Engine API | `.claude-plugin/types/claude-code/index.d.ts` (generated after the first load) |
+| Area                 | Files                                                                          |
+| -------------------- | ------------------------------------------------------------------------------ |
+| Hooks module         | [hooks/register.tsx](../../hooks/register.tsx)                                 |
+| Manifest and options | [.claude-plugin/plugin.json](../../.claude-plugin/plugin.json)                 |
+| State contract       | `types/index.d.ts` (new)                                                       |
+| Engine API           | `.claude-plugin/types/claude-code/index.d.ts` (generated after the first load) |
 
 ### Contracts
 
@@ -102,7 +102,7 @@ symbols. The tree area is empty for now.
 - [ ] Write the symbol builder and glyph table in `hooks/symbols.ts`.
 - [ ] In `hooks/register.tsx`: register `/vacuo`, open the pane at `session.start`, draw the header in `ui.render`.
 - [ ] Refresh the snapshot on a 2-second `$.clock.every` (B9, header half).
-- [ ] Run `claude plugin validate .`, `tsc -p .` and `claude plugin test .`.
+- [ ] Run `bun run format` and `bun run check`.
 - [ ] Manual: check the header in a live session on the monorepo.
 
 ## Phase 2: List changed files with line counts
@@ -126,7 +126,7 @@ status, refreshed after Claude's tool calls and on the poll.
 - [ ] Write the tree builder in `hooks/tree.ts`: build, compact, roll up counts, sort folders first.
 - [ ] Draw the rows in the pane: indent, name colored by status, counts on the right.
 - [ ] Refresh after `tool.call` for `Edit`, `Write`, `NotebookEdit` and `Bash`.
-- [ ] Run `claude plugin validate .`, `tsc -p .` and `claude plugin test .`.
+- [ ] Run `bun run format` and `bun run check`.
 
 ## Phase 3: Shimmer the file Claude is editing
 
@@ -147,7 +147,7 @@ status, refreshed after Claude's tool calls and on the poll.
 - [ ] Mark done or clear after `next(e)` resolves, and expire done marks after the flash.
 - [ ] Add `hooks/rows.tsx`: a `Client` module that draws the rows and animates lit ones with a shimmer.
 - [ ] Switch the pane's tree to the `Client` module.
-- [ ] Run `claude plugin validate .`, `tsc -p .` and `claude plugin test .`.
+- [ ] Run `bun run format` and `bun run check`.
 
 ## Next step
 
