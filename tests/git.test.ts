@@ -70,5 +70,5 @@ test('statusSymbols follows starship order and spelling', () => {
 	).toBe('=$✘»!+?')
 	expect(statusSymbols({ ...clean, ahead: 2 })).toBe('⇡2')
 	expect(statusSymbols({ ...clean, behind: 3 })).toBe('⇣3')
-	expect(statusSymbols({ ...clean, ahead: 1, behind: 1 })).toBe('⇕')
+	expect(statusSymbols({ ...clean, ahead: 2, behind: 1 })).toBe('⇕⇡2⇣1')
 })

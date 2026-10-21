@@ -10,7 +10,7 @@ runs. A smaller, focused take on [claude-code-filetree](https://github.com/data-
 
 - **B1.** A `vacuo` pane opens when a session starts, and `/vacuo` opens it again after it was closed. — _proved by:_ `tests/pane.test.ts` › the pane opens at session start and again on /vacuo
 - **B2.** The header shows a branch icon and the branch name, then the status symbols that apply, in starship's order
-  and spelling: `=` conflicted, `⇡N` ahead, `⇣N` behind, `⇕` diverged, `?` untracked, `$` stashed, `!` modified,
+  and spelling: `=` conflicted, `⇡N` ahead, `⇣N` behind, `⇕⇡N⇣N` diverged, `?` untracked, `$` stashed, `!` modified,
   `+` staged, `»` renamed, `✘` deleted. A clean, up-to-date branch shows no symbols. — _proved by:_ `tests/git.test.ts` › statusSymbols follows starship order and spelling; `tests/pane.test.ts` › the header shows the branch and starship symbols, on every surface
 - **B3.** On a detached HEAD the header shows the short commit hash where the branch name goes. — _proved by:_ `tests/git.test.ts` › parseStatus shows the short hash on a detached HEAD
 - **B4.** Outside a git repo the header says `not a git repo` and the tree is empty. — _proved by:_ `tests/pane.test.ts` › outside a git repo the header says so
