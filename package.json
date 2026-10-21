@@ -1,0 +1,20 @@
+{
+	"name": "vacuo",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"format": "oxfmt .",
+		"format:check": "oxfmt --check .",
+		"lint": "oxlint .",
+		"lint:fix": "oxlint --fix .",
+		"typecheck": "tsc -p .",
+		"validate": "claude plugin validate .",
+		"test": "claude plugin test .",
+		"check": "bun run format:check && bun run lint && bun run typecheck && bun run validate && bun run test"
+	},
+	"devDependencies": {
+		"oxfmt": "^0.74.0",
+		"oxlint": "^1.89.0",
+		"typescript": "^7.0.2"
+	}
+}
