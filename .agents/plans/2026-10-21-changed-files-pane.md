@@ -18,13 +18,13 @@ runs. A smaller, focused take on [claude-code-filetree](https://github.com/data-
   it is `⎇`. — _proved by:_ `tests/pane.test.ts` › the three `glyphs:` tests
 - **B6.** The tree lists only changed files (modified, staged, untracked, deleted, renamed) against `HEAD`, under the
   folders that contain them. A folder with a single child folder and no files of its own is drawn as one row
-  (`.ai/plans/`). — _proved by:_
+  (`.ai/plans/`). — _proved by:_ `tests/tree.test.ts` › treeRows compacts single-child folder chains…; `tests/git.test.ts` › parseStatus lists each changed file…; `tests/pane.test.ts` › the tree lists changed files under compacted folders…
 - **B7.** Each file shows `+N -N` on the right; an untracked file counts all its lines as added; a folder shows the sum
-  of everything under it. A binary file shows `bin`. — _proved by:_
+  of everything under it. A binary file shows `bin`. — _proved by:_ `tests/git.test.ts` › parseNumstat reads counts, renames, binaries and --no-index output; `tests/tree.test.ts` › treeRows sorts folders before files and rolls counts up…; `tests/pane.test.ts` › the tree lists changed files…
 - **B8.** File names are colored by status: added/untracked green, modified yellow, deleted red with strikethrough,
-  renamed blue. — _proved by:_
+  renamed blue. — _proved by:_ `tests/pane.test.ts` › the tree lists changed files under compacted folders, with counts and status colors
 - **B9.** The tree and header refresh after every Claude Edit, Write, NotebookEdit or Bash call, and every 2 seconds,
-  so changes made outside Claude also show. — _proved by:_
+  so changes made outside Claude also show. — _proved by:_ `tests/pane.test.ts` › a Write is followed by a refresh that shows the new file (the 2-second poll: manual)
 - **B10.** While Claude's Edit, Write or NotebookEdit on a file runs, that file's row shimmers; a file that does not
   exist yet appears as a shimmering row immediately. — _proved by:_
 - **B11.** When the edit finishes, the row flashes once and returns to its status color within about 2 seconds; a
@@ -115,21 +115,21 @@ status, refreshed after Claude's tool calls and on the poll.
 
 **Test Checklist:**
 
-- [ ] Pane test (B6, B7, B8): a fixture repo with nested changes draws the expected rows, counts and colors.
-- [ ] Unit test (B6): the tree builder compacts single-child chains and keeps folders with files expanded.
-- [ ] Unit test (B7): numstat parsing (including renames and `-` for binary) and folder roll-up.
-- [ ] Pane test (B9): a `Write` through `$.tool.call` is followed by a refresh that shows the new file.
+- [x] Pane test (B6, B7, B8): a fixture repo with nested changes draws the expected rows, counts and colors.
+- [x] Unit test (B6): the tree builder compacts single-child chains and keeps folders with files expanded.
+- [x] Unit test (B7): numstat parsing (including renames and `-` for binary) and folder roll-up.
+- [x] Pane test (B9): a `Write` through `$.tool.call` is followed by a refresh that shows the new file.
 - [ ] Manual, live session (B9): an edit made in an editor outside Claude appears within 2 seconds. A test can't
       reproduce the timing of an outside writer.
 
 **To-do:**
 
-- [ ] Parse file entries from `porcelain=v2` (ordinary, renamed, unmerged, untracked) in `hooks/git.ts`.
-- [ ] Read `git diff HEAD --numstat -z` and untracked line counts; merge them into the snapshot.
-- [ ] Write the tree builder in `hooks/tree.ts`: build, compact, roll up counts, sort folders first.
-- [ ] Draw the rows in the pane: indent, name colored by status, counts on the right.
-- [ ] Refresh after `tool.call` for `Edit`, `Write`, `NotebookEdit` and `Bash`.
-- [ ] Run `bun run format` and `bun run check`.
+- [x] Parse file entries from `porcelain=v2` (ordinary, renamed, unmerged, untracked) in `hooks/git.ts`.
+- [x] Read `git diff HEAD --numstat -z` and untracked line counts; merge them into the snapshot.
+- [x] Write the tree builder in `hooks/tree.ts`: build, compact, roll up counts, sort folders first.
+- [x] Draw the rows in the pane: indent, name colored by status, counts on the right.
+- [x] Refresh after `tool.call` for `Edit`, `Write`, `NotebookEdit` and `Bash`.
+- [x] Run `bun run format` and `bun run check`.
 
 ## Phase 3: Shimmer the file Claude is editing
 
@@ -154,4 +154,4 @@ status, refreshed after Claude's tool calls and on the poll.
 
 ## Next step
 
-Phase 2: parse the file entries from `porcelain=v2` and read `git diff HEAD --numstat -z`, then build and draw the tree.
+Phase 2: check the tree in a live session, including an edit made outside Claude (the manual test), then mark the phase ✅.

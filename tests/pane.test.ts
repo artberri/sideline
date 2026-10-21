@@ -2,7 +2,13 @@ import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
-type World = { status?: string; hasStash?: boolean; hasNerdFont?: boolean }
+type World = {
+	status?: string
+	numstat?: string
+	untracked?: Record<string, string>
+	hasStash?: boolean
+	hasNerdFont?: boolean
+}
 
 const PANE = {
 	plugin: 'vacuo',
@@ -32,7 +38,7 @@ const done = (exitCode: number, stdout = '') => ({
 })
 
 function world(on: On, w: World, opens: string[]) {
-	mock.clock(on, { now: 1_800_000_000_000 })
+	const clock = mock.clock(on, { now: 1_800_000_000_000 })
 	on('session.start', (_, e) => ({ cwd: e.cwd }))
 	on('session.cwd', () => ({ value: '/repo' }))
 	on('command.register', () => ({ value: { command: 'vacuo' } }))
@@ -45,8 +51,12 @@ function world(on: On, w: World, opens: string[]) {
 		if (argv[0] === 'sh') return done(0, w.hasNerdFont ? 'nerd\n' : 'plain\n')
 		if (argv.includes('status')) return w.status === undefined ? done(128) : done(0, w.status)
 		if (argv.includes('refs/stash')) return done(w.hasStash ? 0 : 1)
+		if (argv.includes('--no-index')) return done(1, w.untracked?.[argv.at(-1) ?? ''] ?? '')
+		if (argv.includes('diff')) return done(0, w.numstat ?? '')
 		return done(0)
 	})
+	on('tool.call', () => ({ result: {} }))
+	return clock
 }
 
 async function drawn($: Engine, surface: 'terminal' | 'desktop') {
@@ -119,3 +129,62 @@ test(
 		expect(await drawn($, 'terminal')).not.toContain('backgroundColor')
 	},
 )
+
+const NESTED = [
+	'# branch.oid 0123456789abcdef',
+	'# branch.head main',
+	'1 .M N... 100644 100644 100644 a a .ai/plans/plan.md',
+	'1 .D N... 100644 100644 000000 a a src/gone.ts',
+	'1 .M N... 100644 100644 100644 a a src/logo.png',
+	'2 R. N... 100644 100644 100644 a a R100 src/new.ts',
+	'src/old.ts',
+	'? src/fresh.ts',
+	'',
+].join('\0')
+
+const NESTED_NUMSTAT = [
+	'3\t1\t.ai/plans/plan.md',
+	'0\t5\tsrc/gone.ts',
+	'-\t-\tsrc/logo.png',
+	'0\t0\t',
+	'src/old.ts',
+	'src/new.ts',
+	'',
+].join('\0')
+
+test('the tree lists changed files under compacted folders, with counts and status colors', async ($, on) => {
+	world(
+		on,
+		{ status: NESTED, numstat: NESTED_NUMSTAT, untracked: { 'src/fresh.ts': '4\t0\t\0/dev/null\0src/fresh.ts\0' } },
+		[],
+	)
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	const text = async (re: RegExp) => (await ui.find({ type: 'Text', text: re }))?.text
+	expect(await text(/\.ai\/plans\//)).toContain('.ai/plans/')
+	expect(await text(/plan\.md/)).toContain('  plan.md')
+	expect(await text(/^src\/$/)).toBe('src/')
+	const tree = JSON.stringify(await ui.drawn())
+	expect(tree).toContain('" +3"')
+	expect(tree).toContain('" -1"')
+	expect(tree).toContain('" +4"')
+	expect(tree).toContain('" -5"')
+	expect(tree).toContain('" bin"')
+	const gone = await ui.find({ type: 'Text', text: /^gone\.ts$/ })
+	expect(gone?.props).toMatchObject({ color: 'error', strikethrough: true })
+	expect((await ui.find({ type: 'Text', text: /^fresh\.ts$/ }))?.props).toMatchObject({ color: 'success' })
+	expect((await ui.find({ type: 'Text', text: /^new\.ts$/ }))?.props).toMatchObject({ color: 'blue' })
+	expect((await ui.find({ type: 'Text', text: /^plan\.md$/ }))?.props).toMatchObject({ color: 'warning' })
+	await ui.unmount()
+})
+
+test('a Write is followed by a refresh that shows the new file', async ($, on) => {
+	const w: World = { status: STATUS }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	expect(await drawn($, 'terminal')).not.toContain('written.ts')
+	w.status = STATUS.replace('? fresh.ts', '? fresh.ts\0? written.ts')
+	await $.tool.call({ tool: 'Write', file_path: '/repo/written.ts', content: 'x' })
+	await clock.settle()
+	expect(await drawn($, 'terminal')).toContain('written.ts')
+})

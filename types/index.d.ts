@@ -12,13 +12,19 @@ export type BranchStatus = {
 	behind: number
 }
 
-export type Header =
+export type FileStatus = 'added' | 'modified' | 'deleted' | 'renamed' | 'conflicted'
+
+export type LineCounts = { added: number; deleted: number; isBinary: boolean }
+
+export type ChangedFile = LineCounts & { path: string; status: FileStatus; isUntracked: boolean }
+
+export type Snapshot =
 	| { kind: 'loading' }
 	| { kind: 'none' }
-	| { kind: 'repo'; branch: string; isDetached: boolean; status: BranchStatus }
+	| { kind: 'repo'; branch: string; isDetached: boolean; status: BranchStatus; files: ChangedFile[] }
 
 declare module 'claude-code' {
 	interface PluginState {
-		vacuo: { header: Header; glyphs: Glyphs }
+		vacuo: { snapshot: Snapshot; glyphs: Glyphs }
 	}
 }

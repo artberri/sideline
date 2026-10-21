@@ -1,21 +1,53 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
+import type { Color, EngineInterface, Register } from 'claude-code'
 
-import type { Header } from '../types'
-import { readHeader } from './git'
+import type { FileStatus, Snapshot } from '../types'
+import { readSnapshot } from './git'
 import { BRANCH_ICON, backgroundOption, resolveGlyphs, statusSymbols } from './symbols'
+import { treeRows } from './tree'
+import type { TreeRow } from './tree'
 
 const PANE = 'vacuo'
 const TITLE = 'Changes'
 const POLL_MS = 2_000
+const REFRESH_AFTER = new Set(['Edit', 'Write', 'NotebookEdit', 'Bash'])
 
-const header = atom({ plugin: 'vacuo', key: 'header' } as const, { kind: 'loading' } as Header)
+const snapshot = atom({ plugin: 'vacuo', key: 'snapshot' } as const, { kind: 'loading' } as Snapshot)
 const glyphs = atom({ plugin: 'vacuo', key: 'glyphs' } as const, 'plain')
 
-async function refresh($: EngineInterface): Promise<void> {
-	const next = await readHeader($, await $.session.cwd())
-	const current = await read($, header)
-	if (JSON.stringify(current) !== JSON.stringify(next)) await update($, header, () => next)
+const STATUS_COLOR: Record<FileStatus, Color> = {
+	added: 'success',
+	modified: 'warning',
+	deleted: 'error',
+	renamed: 'blue',
+	conflicted: 'error',
+}
+
+let refreshing: Promise<void> | null = null
+let isRefreshQueued = false
+
+async function readAndStore($: EngineInterface): Promise<void> {
+	const next = await readSnapshot($, await $.session.cwd())
+	const current = await read($, snapshot)
+	if (JSON.stringify(current) !== JSON.stringify(next)) await update($, snapshot, () => next)
+}
+
+// The poll and tool calls overlap; one read runs at a time, and a request during it runs once more afterwards.
+function refresh($: EngineInterface): Promise<void> {
+	if (refreshing) {
+		isRefreshQueued = true
+		return refreshing
+	}
+	refreshing = readAndStore($)
+		.catch(() => undefined)
+		.finally(() => {
+			refreshing = null
+			if (isRefreshQueued) {
+				isRefreshQueued = false
+				void refresh($)
+			}
+		})
+	return refreshing
 }
 
 export const register: Register = (on, options) => {
@@ -37,9 +69,15 @@ export const register: Register = (on, options) => {
 		return { text: 'Changes pane opened.' }
 	})
 
+	on('tool.call', async ($, e, next) => {
+		const result = await next(e)
+		if (REFRESH_AFTER.has(String(e.tool))) void refresh($)
+		return result
+	})
+
 	on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
 		const { Box, Text } = $.ui.resolve(e)
-		const shown = await read($, header)
+		const shown = await read($, snapshot)
 		const icon = BRANCH_ICON[await read($, glyphs)]
 		const fill = (body: JSX.Element) => (
 			<Box
@@ -53,14 +91,49 @@ export const register: Register = (on, options) => {
 				{body}
 			</Box>
 		)
+		// oxlint-disable-next-line unicorn/consistent-function-scoping -- it reads Box and Text from $.ui.resolve through JSX
+		const line = (row: TreeRow) => (
+			<Box key={row.id} flexDirection="row">
+				<Box flexGrow={1} flexShrink={1} overflow="hidden">
+					<Text wrap="truncate-end">
+						{'  '.repeat(row.depth)}
+						{row.status ? (
+							<Text
+								color={STATUS_COLOR[row.status]}
+								strikethrough={row.status === 'deleted'}
+								bold={row.status === 'conflicted'}
+							>
+								{row.name}
+							</Text>
+						) : (
+							<Text>{row.name}</Text>
+						)}
+					</Text>
+				</Box>
+				{row.isBinary ? (
+					<Text dimColor> bin</Text>
+				) : (
+					<Text>
+						{row.added > 0 && <Text color="success">{` +${row.added}`}</Text>}
+						{row.deleted > 0 && <Text color="error">{` -${row.deleted}`}</Text>}
+					</Text>
+				)}
+			</Box>
+		)
 		if (shown.kind === 'loading') return fill(<Text> </Text>)
 		if (shown.kind === 'none') return fill(<Text dimColor>not a git repo</Text>)
 		const symbols = statusSymbols(shown.status)
+		const rows = treeRows(shown.files)
 		return fill(
-			<Text>
-				<Text color="magenta" bold>{`${icon} ${shown.branch}`}</Text>
-				{symbols && <Text color="red" bold>{` [${symbols}]`}</Text>}
-			</Text>,
+			<Box flexDirection="column">
+				<Text>
+					<Text color="magenta" bold>{`${icon} ${shown.branch}`}</Text>
+					{symbols && <Text color="red" bold>{` [${symbols}]`}</Text>}
+				</Text>
+				<Box flexDirection="column" marginTop={1}>
+					{rows.length === 0 ? <Text dimColor>no changes</Text> : rows.map(line)}
+				</Box>
+			</Box>,
 		)
 	})
 }
