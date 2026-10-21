@@ -8,14 +8,14 @@ runs. A smaller, focused take on [claude-code-filetree](https://github.com/data-
 
 ## Behaviour
 
-- **B1.** A `vacuo` pane opens when a session starts, and `/vacuo` opens it again after it was closed. — _proved by:_
+- **B1.** A `vacuo` pane opens when a session starts, and `/vacuo` opens it again after it was closed. — _proved by:_ `tests/pane.test.ts` › the pane opens at session start and again on /vacuo
 - **B2.** The header shows a branch icon and the branch name, then the status symbols that apply, in starship's order
   and spelling: `=` conflicted, `⇡N` ahead, `⇣N` behind, `⇕` diverged, `?` untracked, `$` stashed, `!` modified,
-  `+` staged, `»` renamed, `✘` deleted. A clean, up-to-date branch shows no symbols. — _proved by:_
-- **B3.** On a detached HEAD the header shows the short commit hash where the branch name goes. — _proved by:_
-- **B4.** Outside a git repo the header says `not a git repo` and the tree is empty. — _proved by:_
+  `+` staged, `»` renamed, `✘` deleted. A clean, up-to-date branch shows no symbols. — _proved by:_ `tests/git.test.ts` › statusSymbols follows starship order and spelling; `tests/pane.test.ts` › the header shows the branch and starship symbols, on every surface
+- **B3.** On a detached HEAD the header shows the short commit hash where the branch name goes. — _proved by:_ `tests/git.test.ts` › parseStatus shows the short hash on a detached HEAD
+- **B4.** Outside a git repo the header says `not a git repo` and the tree is empty. — _proved by:_ `tests/pane.test.ts` › outside a git repo the header says so
 - **B5.** With a Nerd Font the branch icon is `` (U+E0A0); without one, or with the `glyphs` option set to `plain`,
-  it is `⎇`. — _proved by:_
+  it is `⎇`. — _proved by:_ `tests/pane.test.ts` › the three `glyphs:` tests
 - **B6.** The tree lists only changed files (modified, staged, untracked, deleted, renamed) against `HEAD`, under the
   folders that contain them. A folder with a single child folder and no files of its own is drawn as one row
   (`.ai/plans/`). — _proved by:_
@@ -86,23 +86,23 @@ symbols. The tree area is empty for now.
 
 **Test Checklist:**
 
-- [ ] Pane test (B1): the pane is opened at `session.start`; `/vacuo` opens it again.
-- [ ] Pane test (B2): on a fixture repo with one staged, one modified, one untracked file and a stash, the header reads
-      `<icon> main +!?$`... in starship's order.
-- [ ] Unit test (B2, B3): the `porcelain=v2` header parser reads branch, ahead/behind and detached HEAD.
-- [ ] Unit test (B2): the symbol builder covers each symbol and diverged (`⇕`).
-- [ ] Pane test (B4): outside a git repo the header says `not a git repo`.
-- [ ] Pane test (B5): `glyphs: plain` draws `⎇`; `nerd` draws ``.
+- [x] Pane test (B1): the pane is opened at `session.start`; `/vacuo` opens it again.
+- [x] Pane test (B2): on a fixture repo with one staged, one modified, one untracked file and a stash, the header reads
+      `⎇ main [$!+?]` (starship's `$all_status$ahead_behind` order, in brackets).
+- [x] Unit test (B2, B3): the `porcelain=v2` header parser reads branch, ahead/behind and detached HEAD.
+- [x] Unit test (B2): the symbol builder covers each symbol and diverged (`⇕`).
+- [x] Pane test (B4): outside a git repo the header says `not a git repo`.
+- [x] Pane test (B5): `glyphs: plain` draws `⎇`; `nerd` draws ``.
 
 **To-do:**
 
-- [ ] Add `glyphs` to `userConfig` in `plugin.json`.
-- [ ] Add `types/index.d.ts` with the snapshot contract and name it in `plugin.json`.
-- [ ] Write the git runner and the `porcelain=v2` parser in `hooks/git.ts`.
-- [ ] Write the symbol builder and glyph table in `hooks/symbols.ts`.
-- [ ] In `hooks/register.tsx`: register `/vacuo`, open the pane at `session.start`, draw the header in `ui.render`.
-- [ ] Refresh the snapshot on a 2-second `$.clock.every` (B9, header half).
-- [ ] Run `bun run format` and `bun run check`.
+- [x] Add `glyphs` to `userConfig` in `plugin.json`.
+- [x] Add `types/index.d.ts` with the snapshot contract and name it in `plugin.json`.
+- [x] Write the git runner and the `porcelain=v2` parser in `hooks/git.ts`.
+- [x] Write the symbol builder and glyph table in `hooks/symbols.ts`.
+- [x] In `hooks/register.tsx`: register `/vacuo`, open the pane at `session.start`, draw the header in `ui.render`.
+- [x] Refresh the snapshot on a 2-second `$.clock.every` (B9, header half).
+- [x] Run `bun run format` and `bun run check`.
 - [ ] Manual: check the header in a live session on the monorepo.
 
 ## Phase 2: List changed files with line counts
@@ -151,4 +151,4 @@ status, refreshed after Claude's tool calls and on the poll.
 
 ## Next step
 
-Phase 1: add the `glyphs` option and the state contract, then the `porcelain=v2` parser and the branch header.
+Phase 1: check the header in a live session (the last to-do), then mark the phase ✅.

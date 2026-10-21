@@ -1,5 +1,15 @@
 {
 	"name": "vacuo",
 	"version": "0.1.0",
-	"description": "Work-in-progress Claude Code mod"
+	"description": "Work-in-progress Claude Code mod",
+	"types": "./types/index.d.ts",
+	"userConfig": {
+		"glyphs": {
+			"type": "string",
+			"title": "Glyphs",
+			"description": "auto uses Nerd Font icons when a Nerd Font is installed; nerd or plain forces one set",
+			"default": "auto",
+			"options": ["auto", "nerd", "plain"]
+		}
+	}
 }
