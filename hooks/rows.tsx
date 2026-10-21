@@ -148,6 +148,8 @@ export const Rows: ClientModule<RowsProps, Local> = (props, surface) => {
 		state.stop()
 		surface.setState({ phase: 0, hovered: state.hovered })
 	}
+	// Registered in both views so a click hands the Client the keyboard; the keys themselves come in a later phase.
+	surface.onKey(() => undefined)
 	if (props.diff) {
 		surface.onPointer(() => undefined)
 		return drawDiff(props.diff, surface.elements, () => surface.post({ back: true }))

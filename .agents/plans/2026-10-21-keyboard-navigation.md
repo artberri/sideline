@@ -33,6 +33,8 @@ jump between changed files from the diff, with a legend that tells the user how.
   at 100,000 characters serialized.
 - **The selection lives in the `Client`'s local state:** simpler and immediate; it is lost on a reload of the mod, which
   only happens while developing.
+- **The rows `Client` always registers `onKey`:** without a key listener a click does not hand it the keyboard (found
+  in Phase 1's live check; filetree registers one too).
 - **`j`/`k` in a diff move between files** (like filetree), not lines: scrolling by line would mean drawing the diff
   ourselves instead of with `Code`.
 - **The legend is honest about focus:** if ctrl+x tab focuses the pane but doesn't hand keys to the `Client` (to check
@@ -65,7 +67,7 @@ jump between changed files from the diff, with a legend that tells the user how.
 - **State:** the `Client`'s local `cursor` (row id); the plugin's `selected`/`diff` stay as they are.
 - **Test suites:** `tests/pane.test.ts`.
 
-## Phase 1: Draw the diff inside the rows Client
+## Phase 1: Draw the diff inside the rows Client ✅
 
 **Description:** The diff view (`← files`, path, `Code format="diff"`) moves into the rows `Client`, so a click that opens
 a diff keeps the keyboard in the pane. It looks the same.
@@ -75,7 +77,7 @@ a diff keeps the keyboard in the pane. It looks the same.
 - [x] Pane test (K8): after a posted press on a file, the `Client` stays mounted and draws the diff (`Code` in `rows`).
 - [x] Pane test: `← files` inside the `Client` goes back to the tree.
 - [x] Unit test: a diff over the limit is cut and ends with `… diff truncated`.
-- [ ] Manual, live session (K8): click a file, then press a key; the pane still has the focus. The kit can't show
+- [x] Manual, live session (K8): click a file, then press a key; the pane still has the focus. The kit can't show
       focus.
 
 **To-do:**
@@ -130,4 +132,4 @@ keys.
 
 ## Next step
 
-Phase 1: click a file in a live session and press a key; the pane should keep the focus (the manual test), then mark the phase ✅.
+Phase 2: give the rows `Client` a cursor and handle `j`/`k`/arrows, `Enter`/`l`/`→` and `h`/`←`/`Backspace`, then the legend.
