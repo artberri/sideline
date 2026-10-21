@@ -139,7 +139,7 @@ status, refreshed after Claude's tool calls and on the poll.
 - [x] Refresh after `tool.call` for `Edit`, `Write`, `NotebookEdit` and `Bash`.
 - [x] Run `bun run format` and `bun run check`.
 
-## Phase 3: Shimmer the file Claude is editing
+## Phase 3: Shimmer the file Claude is editing ✅
 
 **Description:** A row shimmers while Claude's edit on it runs and flashes once when it finishes.
 
@@ -150,7 +150,7 @@ status, refreshed after Claude's tool calls and on the poll.
       clears it without a done mark.
 - [x] Client test (B10, B11): the rows module advances its shimmer phase on `surface.every` and stops its timer when
       nothing is lit.
-- [ ] Manual, live session (B10): the shimmer shows during "Updating …" on a real edit. The kit can't show paint.
+- [x] Manual, live session (B10): the shimmer shows during "Updating …" on a real edit. The kit can't show paint.
 
 **To-do:**
 
@@ -162,4 +162,4 @@ status, refreshed after Claude's tool calls and on the poll.
 
 ## Next step
 
-Phase 3: watch a real edit shimmer in a live session (the manual test), then mark the phase ✅ and archive the plan.
+All phases are done; the plan is archived.
