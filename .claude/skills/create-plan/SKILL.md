@@ -55,7 +55,8 @@ reasonable default and let them course-correct.
 
 Read the code the task will touch. Without this, the plan is generic and the phase breakdown won't match reality.
 
-- Read `hooks/` and any existing plan in `.agents/plans/`.
+- Read `hooks/` and any existing plan in `.agents/plans/`, and check `.agents/follow-ups.md` for items the task
+  covers; remove them there once the plan includes them.
 - Check the engine API in the typings for every event, `$` method and element the plan will name. If the mod has not
   loaded yet, the `plugin-authoring` skill names a typings file for this build.
 - When the user points at another mod as a reference, read its source (clone it into the scratchpad, never into this

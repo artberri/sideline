@@ -17,6 +17,7 @@ hooks/register.tsx           export const register: Register = (on, options) => 
 types/index.d.ts             $.state contract (once the mod keeps state)
 tests/*.test.ts(x)           claude plugin test suites
 .agents/plans/               implementation plans; finished ones in done/
+.agents/follow-ups.md        follow-ups and ideas not planned yet
 .claude/skills/              create-plan and execute-plan
 ```
 

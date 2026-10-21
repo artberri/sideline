@@ -59,8 +59,10 @@ user. Never pass `--no-gpg-sign`. Don't push unless asked.
 
 1. Summarize: what changed (uncommitted, waiting on the live check), what the user should now see in the pane, any
    deviation from the plan.
-2. List follow-ups and anything that surprised you.
+2. List follow-ups and anything that surprised you, and offer to add the follow-ups to `.agents/follow-ups.md`
+   (one bullet each, with where it came from). Add them only when the user says yes.
 3. **Ask whether to go on to the next phase.** Don't continue on your own.
 
 When the last phase is ✅, move the plan with `git mv .agents/plans/<plan>.md .agents/plans/done/<plan>.md` in that
-same final commit and tell the user the plan is done.
+same final commit, tell the user the plan is done, and offer to move the plan's own follow-ups section, if it has one,
+into `.agents/follow-ups.md`.
