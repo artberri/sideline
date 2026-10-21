@@ -18,7 +18,7 @@ export type RowsProps = { rows: RowSpec[]; hoverBackground: string | null }
 
 type Local = { phase: number; hovered: number; stop?: () => void }
 
-const TICK_MS = 90
+const TICK_MS = 50
 const BAND = 3
 
 // A band of bright characters sweeps across the name; the rest stays dim, both in Claude's own accent color.
@@ -37,7 +37,7 @@ export function drawRows(
 	const name = (row: RowSpec) => {
 		if (row.lit === 'done') {
 			return (
-				<Text color="success" bold>
+				<Text color="claude" bold>
 					{row.name}
 				</Text>
 			)

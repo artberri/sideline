@@ -197,7 +197,7 @@ test('a Write is followed by a refresh that shows the new file', async ($, on) =
 
 type Child = { props?: { color?: string } }
 
-// What a file's row shows: the shimmer paints its icon in Claude's color, the flash paints its name green.
+// What a file's row shows: the shimmer paints its icon in Claude's color, the flash paints only its name in it.
 async function litOf($: Engine, name: string): Promise<'running' | 'done' | null | 'absent'> {
 	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
 	const escaped = name.replaceAll('.', '\\.')
@@ -206,7 +206,7 @@ async function litOf($: Engine, name: string): Promise<'running' | 'done' | null
 	if (!row) return 'absent'
 	const [, icon, label] = (row.children ?? []) as Child[]
 	if (icon?.props?.color === 'claude') return 'running'
-	if (label?.props?.color === 'success') return 'done'
+	if (label?.props?.color === 'claude') return 'done'
 	return null
 }
 

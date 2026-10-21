@@ -14,7 +14,7 @@ const PANE = 'vacuo'
 const TITLE = 'Changes'
 const POLL_MS = 2_000
 const REFRESH_AFTER = new Set(['Edit', 'Write', 'NotebookEdit', 'Bash'])
-const FLASH_MS = 1_500
+const FLASH_MS = 100
 // Most edits take milliseconds; the shimmer plays at least this long so it can be seen, without delaying the tool.
 const MIN_SHIMMER_MS = 1_200
 // Claude Code's own result gutter, which a row drawn in place of a ToolResult does not get.
