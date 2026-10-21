@@ -61,3 +61,5 @@ bun run check       # oxfmt --check, oxlint, tsc -p ., claude plugin validate .,
 - Run git with `--no-optional-locks` so polling never blocks Claude's own git commands.
 - Every glyph has a plain fallback (the `glyphs` option: `auto`, `nerd`, `plain`).
 - Conventional commits, small and one topic each. Plans are worked with `/create-plan` and `/execute-plan`.
+- To create a plan, always invoke the `create-plan` skill first; to work on one (start, continue or resume a phase),
+  always invoke the `execute-plan` skill first, even when the request doesn't name it.
