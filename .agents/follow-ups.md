@@ -5,11 +5,6 @@ here (or move it into the plan) once it is planned.
 
 ## Follow-ups
 
-- **Write a `README.md`.** `claude plugin validate` reports a missing README as the one problem left for submitting
-  the mod to the plugin directory (the license is in place); it should say what the mod does, how to install it and its
-  options (`glyphs`, `background`, `transcriptDiffs`, `transcriptCommands`, `sessionBox`). It should say the icons need
-  Nerd Fonts v3 (3.0 or later): 33 of them were added in 3.0, and `dev-bun` (U+E76F) was another glyph in 2.x.
-  _From: the validator's output since the scaffold, and the Nerd Font icon review._
 - **Fold other tools' long inputs.** Agent prompts and MCP calls can print long inputs in the transcript too; they
   could show a short label the way Bash rows show their description. _From: the hide-bash-commands plan._
     - **Measure first (in progress).** Branch `probe/tool-input-lengths` (pushed) has a temporary probe: each finished

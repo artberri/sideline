@@ -103,8 +103,6 @@ bun run check    # oxfmt --check, oxlint, tsc -p ., claude plugin validate ., cl
 `tsc` needs the generated typings, so load the mod once first. CI (`.github/workflows/check.yml`) runs the same checks
 except `tsc`, against the pinned Claude Code build and the latest one; only the pinned one has to pass.
 
-`claude plugin validate` reports a missing README as a problem for the plugin directory; that one is expected for now.
-
 ## Tests
 
 Tests use `claude-code/testing`. Fake the world once in a helper (session, clock, canned stdout for each `git`
