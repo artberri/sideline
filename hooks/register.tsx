@@ -43,6 +43,10 @@ const LOG_GLYPH: Record<LoggedCommand['state'], string> = { running: '●', done
 const LOG_GLYPH_COLOR: Record<LoggedCommand['state'], Color> = { running: 'claude', done: 'success', failed: 'error' }
 // What a titled box takes from the width inside the pane: its border and its padding, each side.
 const BOX_FRAME = 4
+// The surfaces that draw a Client. VS Code's element table answers `'Client' in` at run time, though it draws none.
+const HAS_CLIENT = new Set(['terminal', 'desktop'])
+// The surfaces the pane opens on at session start.
+const OPENS_ON = new Set(['terminal', 'desktop'])
 const POLL_MS = 2_000
 const REFRESH_AFTER = new Set(['Edit', 'Write', 'NotebookEdit', 'Bash'])
 const FLASH_MS = 100
@@ -369,7 +373,10 @@ export const register: Register = (on, options) => {
 		const usage = await $.session.usage().catch(() => null)
 		if (usage) await update($, session, (info) => ({ ...info, ...readings(usage) }))
 		await refresh($)
-		void $.ui.open({ id: PANE, title: TITLE })
+		// The pane opens by itself where it is laid out for: the terminal and Claude Code Desktop. In VS Code or the
+		// mobile app alone it waits for /sideline.
+		if ((await $.session.surfaces()).some((surface) => OPENS_ON.has(surface)))
+			void $.ui.open({ id: PANE, title: TITLE })
 		$.clock.every(POLL_MS, () => void refresh($))
 		return next(e)
 	})
@@ -856,7 +863,7 @@ export const register: Register = (on, options) => {
 								</Box>
 							) : rows.length === 0 && !diffView ? (
 								<Text dimColor>no changes</Text>
-							) : 'Client' in elements ? (
+							) : HAS_CLIENT.has(e.surface) && 'Client' in elements ? (
 								<elements.Client
 									key="rows"
 									module="./rows.tsx"

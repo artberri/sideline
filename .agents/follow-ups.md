@@ -5,8 +5,6 @@ here (or move it into the plan) once it is planned.
 
 ## Follow-ups
 
-- **Clicks and keys on mobile and VS Code.** Those surfaces have no `Client`, so the tree can't be clicked or driven by
-  keys there; it draws, but without interaction. _From: the transcript-diffs and keyboard-navigation plans._
 - **Write a `README.md`.** `claude plugin validate` reports a missing README as the one problem left for submitting
   the mod to the plugin directory (the license is in place); it should say what the mod does, how to install it and its
   options (`glyphs`, `background`, `transcriptDiffs`, `transcriptCommands`, `sessionBox`). It should say the icons need
@@ -24,6 +22,10 @@ here (or move it into the plan) once it is planned.
   ends, and `classic.PermissionRequest` is swallowed by `cc-plugin-sec-default` before sideline. Worth another look
   if the engine gains an event for a dialog opening and closing. _From: the pane-boxes-and-state plan's Phase 3
   probe._
+- **The pane in VS Code and the mobile app.** It opens there only on `/sideline`, and is laid out for the terminal:
+  the box titles fall outside their boxes (no overlay), it doesn't take the pane's width, and those surfaces have no
+  `Client`, so the tree can't be clicked (row Buttons drew as yellow chips and didn't respond). _From: trying the pane
+  in VS Code._
 
 ## Ideas
 

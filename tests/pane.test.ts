@@ -13,6 +13,7 @@ type World = {
 	tool?: () => unknown
 	diffs?: Record<string, string>
 	ran?: string[][]
+	surfaces?: ('terminal' | 'desktop' | 'vscode' | 'mobile')[]
 }
 
 const PANE = {
@@ -46,6 +47,7 @@ function world(on: On, w: World, opens: string[]) {
 	const clock = mock.clock(on, { now: 1_800_000_000_000 })
 	on('session.start', (_, e) => ({ cwd: e.cwd }))
 	on('session.cwd', () => ({ value: '/repo' }))
+	on('session.surfaces', () => ({ value: w.surfaces ?? ['terminal'] }))
 	on('session.model', () => ({ value: 'claude-opus-5-5' }))
 	on('command.register', () => ({ value: { command: 'sideline' } }))
 	on('ui.open', (_, e) => {
@@ -1073,4 +1075,36 @@ test('an untracked file is counted again only after its size or modification tim
 	mtimeMs = 2_000
 	await clock.advance(2_100)
 	expect(counted()).toBe(2)
+})
+
+test('without a Client (VS Code, mobile) the tree still draws', async ($, on) => {
+	world(on, { status: STATUS }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	for (const surface of ['vscode', 'mobile'] as const) {
+		const ui = await $.ui.mount({ ...PANE, surface })
+		expect(await ui.find({ type: 'Text', text: /modified\.ts/ })).toBeDefined()
+		await ui.unmount()
+	}
+})
+
+test('the pane opens by itself with a terminal or desktop attached, not in VS Code or mobile alone', async ($, on) => {
+	const opens: string[] = []
+	const w: World = { status: STATUS, surfaces: ['vscode'] }
+	world(on, w, opens)
+	await $.session.start({ cwd: '/repo', surface: 'vscode', isInteractive: true })
+	expect(opens).toEqual([])
+	await $.command.run({
+		command: 'sideline',
+		args: '',
+		origin: { kind: 'composer' },
+		presentation: { isFullscreen: false, columns: 100 },
+	})
+	expect(opens).toEqual(['sideline'])
+})
+
+test('the pane opens by itself when a terminal is attached alongside mobile', async ($, on) => {
+	const opens: string[] = []
+	world(on, { status: STATUS, surfaces: ['terminal', 'mobile'] }, opens)
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	expect(opens).toEqual(['sideline'])
 })
