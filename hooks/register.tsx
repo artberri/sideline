@@ -865,10 +865,12 @@ export const register: Register = (on, options) => {
 								</Box>
 							) : rows.length === 0 && !diffView ? (
 								<Box flexDirection="column">
-									<Text dimColor>no changes</Text>
+									<Text dimColor>No uncommitted changes</Text>
 									<Box flexDirection="column" marginTop={1}>
+										<Text bold>Recent commits</Text>
 										{shown.commits.length === 0 && <Text dimColor>no commits yet</Text>}
-										{shown.commits.slice(0, Math.max(0, shownRows - 2)).map((commit) => (
+										{/* Under the status line, a blank row and the heading. */}
+										{shown.commits.slice(0, Math.max(0, shownRows - 3)).map((commit) => (
 											<Box key={`commit-${commit.sha}`} justifyContent="space-between">
 												<Text wrap="truncate-end">
 													<Text dimColor>{`${commit.sha} `}</Text>

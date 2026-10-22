@@ -8,8 +8,8 @@ and `h` or `← back` steps out one level at a time.
 
 ## Behaviour
 
-- **B1.** With no changes, `CHANGES` reads "no changes" and, under it, lists as many recent commits as the box fits, one
-  line each: `abc1234 subject` with the age (`2h`) on the right, cut to the width. A repo with no commits reads "no commits yet". — _proved by:_ `tests/pane.test.ts` › "with no changes the box lists the recent commits under no changes", "a short pane lists only the commits that fit", "a repo with no commits reads no commits yet", "with changes no git log runs and no commits show"; `tests/git.test.ts` › "parseLog reads each commit line, and nothing from an empty log", "shortAge is the largest whole unit, now under a minute"
+- **B1.** With no changes, `CHANGES` reads "No uncommitted changes" and, under a "Recent commits" heading, lists as many recent commits as the box fits, one
+  line each: `abc1234 subject` with the age (`2h`) on the right, cut to the width. A repo with no commits reads "no commits yet". — _proved by:_ `tests/pane.test.ts` › "with no changes the box says so and lists the recent commits under a heading", "a short pane lists only the commits that fit", "a repo with no commits reads no commits yet", "with changes no git log runs and no commits show"; `tests/git.test.ts` › "parseLog reads each commit line, and nothing from an empty log", "shortAge is the largest whole unit, now under a minute"
 - **B2.** Clicking a commit opens it in `CHANGES`: a first row `← back  abc1234 subject`, the top-right border label
   reads `abc1234` in place of the file count, and the box lists the files the commit changed as the usual tree, with
   icons, status colours and `+N -N`. The first commit of a repo opens too. — _proved by:_
@@ -24,8 +24,11 @@ and `h` or `← back` steps out one level at a time.
 
 Decisions (2026-10-23, with the user):
 
-- **How many:** as many commits as the box's window fits (`changesRows` less the "no changes" line and the blank under
-  it). The mod reads a fixed 50 with one `git log` and draws the ones that fit, so the pane's height needs no new read.
+- **How many:** as many commits as the box's window fits (`changesRows` less the status line, the blank under it and
+  the heading). The mod reads a fixed 50 with one `git log` and draws the ones that fit, so the pane's height needs no
+  new read.
+- **Wording** (asked live): "No uncommitted changes", not "no changes", and a bold "Recent commits" heading over the
+  list.
 - **Opening a commit** shows its files as the tree, then a file's diff, the way working changes do, not the whole
   commit's diff at once.
 - **Indicator:** a header row `← back  abc1234 subject` and the commit's short hash as the top-right border label

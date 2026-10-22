@@ -687,7 +687,7 @@ test('with no changes the pane shows no hints', async ($, on) => {
 	world(on, { status: ['# branch.oid 0123456789abcdef', '# branch.head main', ''].join('\0') }, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	const text = await drawn($, 'terminal')
-	expect(text).toContain('no changes')
+	expect(text).toContain('No uncommitted changes')
 	expect(text).not.toContain('"label":"down"')
 })
 
@@ -720,7 +720,7 @@ test('no changes and not a git repo show inside the CHANGES box', async ($, on) 
 	world(on, { status: ['# branch.oid 0123456789abcdef', '# branch.head main', ''].join('\0') }, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-	expect(JSON.stringify(await ui.find({ key: 'changes' }))).toContain('no changes')
+	expect(JSON.stringify(await ui.find({ key: 'changes' }))).toContain('No uncommitted changes')
 	await ui.unmount()
 })
 
@@ -1122,13 +1122,14 @@ const LOG = [
 	.map(([sha, subject, seconds]) => `${sha}\0${subject}\0${seconds}\0`)
 	.join('\n')
 
-test('with no changes the box lists the recent commits under no changes', async ($, on) => {
+test('with no changes the box says so and lists the recent commits under a heading', async ($, on) => {
 	world(on, { status: CLEAN, log: LOG }, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
 	const box = JSON.stringify(await ui.find({ key: 'changes' }))
 	await ui.unmount()
-	expect(box).toContain('no changes')
+	expect(box).toContain('No uncommitted changes')
+	expect(box).toContain('Recent commits')
 	expect(box).toContain('abc1234 ')
 	expect(box).toContain('feat: draw the tree')
 	expect(box).toContain(' 1h')
@@ -1139,12 +1140,12 @@ test('with no changes the box lists the recent commits under no changes', async 
 test('a short pane lists only the commits that fit', async ($, on) => {
 	world(on, { status: CLEAN, log: LOG }, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
-	// 18 rows, less the title and the box's border (3), SESSION (4) and COMMANDS (7), leave 4 content rows with no
-	// hints: no changes, a blank, and two commits.
+	// 19 rows, less the title and the box's border (3), SESSION (4) and COMMANDS (7), leave 5 content rows with no
+	// hints: the status line, a blank, the heading, and two commits.
 	const ui = await $.ui.mount({
 		...PANE,
 		surface: 'terminal',
-		props: { ...PANE.props, scroll: { offset: 0, bodyRows: 18 } },
+		props: { ...PANE.props, scroll: { offset: 0, bodyRows: 19 } },
 	})
 	const box = JSON.stringify(await ui.find({ key: 'changes' }))
 	await ui.unmount()
