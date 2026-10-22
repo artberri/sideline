@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { parseNumstat, parseStatus } from '../hooks/git'
-import { lighten, statusSymbols } from '../hooks/symbols'
+import { lighten, rowDotFor, statusSymbols } from '../hooks/symbols'
 
 const NUL = '\0'
 
@@ -109,4 +109,10 @@ test('parseNumstat reads counts, renames, binaries and --no-index output', () =>
 test('lighten mixes a little white into a background color', () => {
 	expect(lighten('#1e1e3f')).toBe('#393956')
 	expect(lighten('#000')).toBe('#1f1f1f')
+})
+
+test('rowDotFor matches Claude Code: ⏺ on macOS, ● elsewhere', () => {
+	expect(rowDotFor('Darwin\n')).toBe('⏺')
+	expect(rowDotFor('Linux\n')).toBe('●')
+	expect(rowDotFor('')).toBe('●')
 })

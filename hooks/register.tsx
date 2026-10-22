@@ -8,7 +8,15 @@ import { rowIcon } from './icons'
 import { cutDiff, drawDiff, drawRows } from './rows'
 import type { RowSpec } from './rows'
 import { bashChangedFiles, countsLabel, summarize } from './summary'
-import { BRANCH_ICON, backgroundOption, lighten, resolveGlyphs, statusSymbols } from './symbols'
+import {
+	BRANCH_ICON,
+	backgroundOption,
+	lighten,
+	resolveGlyphs,
+	resolveRowDot,
+	rowDotFor,
+	statusSymbols,
+} from './symbols'
 import { resolveCursor, treeRows } from './tree'
 import type { TreeRow } from './tree'
 
@@ -48,6 +56,8 @@ let refreshing: Promise<void> | null = null
 let isRefreshQueued = false
 // The last description a live group's line showed, for the moment the next call's input is still being written.
 let lastDescription: string | undefined
+// Claude Code's row dot on this machine, read at session start.
+let rowDot = rowDotFor('')
 
 async function readAndStore($: EngineInterface): Promise<void> {
 	const next = await readSnapshot($, await $.session.cwd())
@@ -202,6 +212,7 @@ export const register: Register = (on, options) => {
 		await $.command.register({ name: 'vacuo', description: 'Show the changed-files pane' })
 		const resolved = await resolveGlyphs($, options.glyphs)
 		await update($, glyphs, () => resolved)
+		rowDot = await resolveRowDot($)
 		await refresh($)
 		void $.ui.open({ id: PANE, title: TITLE })
 		$.clock.every(POLL_MS, () => void refresh($))
@@ -277,7 +288,7 @@ export const register: Register = (on, options) => {
 		return (
 			<Box marginTop={1}>
 				<Text>
-					<Text dimColor>● </Text>
+					<Text dimColor>{`${rowDot} `}</Text>
 					{description}
 				</Text>
 			</Box>
@@ -292,7 +303,7 @@ export const register: Register = (on, options) => {
 		const { Box, Text } = $.ui.resolve(e)
 		return (
 			<Box marginTop={1}>
-				<Text>{`● ${ANSWERS_HEADER}`}</Text>
+				<Text>{`${rowDot} ${ANSWERS_HEADER}`}</Text>
 			</Box>
 		)
 	})

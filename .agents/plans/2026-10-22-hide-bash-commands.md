@@ -39,6 +39,8 @@ the bottom of vacuo's pane, while it runs.
 - **While the next call is being written, the group line keeps the last description.** Seen live: a Bash call joins
   the group with an empty input while the model writes it, and the engine's line then shows the previous description
   with a command under it.
+- **Rows vacuo draws use Claude Code's dot:** `⏺` on macOS, `●` elsewhere, read once from `uname -s` at session start;
+  a plain `●` looked smaller next to the engine's rows on macOS.
 - **Short one-liners stay** in finished rows. `Bash(git status)` reads fine; a command is "long" when it has a newline
   or is over 80 characters. 80 is a fixed limit since `ToolUse` carries no width.
 - **One option, `transcriptCommands: hide | show`** (default `hide`), next to `transcriptDiffs`, for the Bash rows, the

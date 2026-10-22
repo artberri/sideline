@@ -35,6 +35,17 @@ export async function resolveGlyphs($: EngineInterface, option: unknown): Promis
 	}
 }
 
+// The dot Claude Code puts before a row: ⏺ on macOS, ● elsewhere. A row vacuo draws in place of the engine's uses it.
+export const rowDotFor = (system: string) => (system.trim() === 'Darwin' ? '⏺' : '●')
+
+export async function resolveRowDot($: EngineInterface): Promise<string> {
+	try {
+		return rowDotFor((await $.process.run(['uname', '-s'], { timeoutMs: 5_000 })).stdout)
+	} catch {
+		return rowDotFor('')
+	}
+}
+
 const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i
 
 export function backgroundOption(option: unknown): string | undefined {
