@@ -1,7 +1,7 @@
 {
 	"name": "sideline",
 	"version": "0.1.0",
-	"description": "Work-in-progress Claude Code mod",
+	"description": "Declutters Claude Code's conversation: long commands, diffs and tool chatter step aside into a tidy pane with your changes, commits and commands.",
 	"author": {
 		"name": "Alberto Varela Sánchez",
 		"email": "hello@albertovarela.net"
@@ -25,7 +25,7 @@
 		"transcriptDiffs": {
 			"type": "string",
 			"title": "Diffs in the conversation",
-			"description": "hide: an edit shows one summary line (Updated path (+N -M)) and its diff is in the pane; show: the conversation shows the diffs as Claude Code draws them. ctrl+o always shows them.",
+			"description": "hide: an edit's row shows its counts (Update(path) (+N -M)) and its diff is in the pane; show: the conversation shows the diffs as Claude Code draws them. ctrl+o always shows them.",
 			"default": "hide",
 			"options": ["hide", "show"]
 		},
