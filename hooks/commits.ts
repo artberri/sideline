@@ -13,3 +13,9 @@ export function shortAge(now: number, then: number): string {
 	for (const [size, unit] of UNITS) if (seconds >= size) return `${Math.floor(seconds / size)}${unit}`
 	return 'now'
 }
+
+// A commit's subject cut to the cells its line leaves: the line is a Button, whose children wrap instead of truncating.
+export function fitSubject(subject: string, columns: number): string {
+	if (columns <= 0) return ''
+	return subject.length > columns ? `${subject.slice(0, Math.max(columns - 1, 0))}…` : subject
+}

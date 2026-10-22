@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { shortAge } from '../hooks/commits'
+import { fitSubject, shortAge } from '../hooks/commits'
 import { parseLog, parseNameStatus, parseNumstat, parseStatus } from '../hooks/git'
 import { lighten, rowDotFor, statusSymbols } from '../hooks/symbols'
 
@@ -148,4 +148,10 @@ test('parseNameStatus reads each status and path, a rename under its new path', 
 		['c.ts', 'deleted'],
 		['new.ts', 'renamed'],
 	])
+})
+
+test('fitSubject cuts a subject to the cells left, with an ellipsis', () => {
+	expect(fitSubject('feat: short', 20)).toBe('feat: short')
+	expect(fitSubject('build: pin the tab width so formatting holds', 20)).toBe('build: pin the tab …')
+	expect(fitSubject('anything', 0)).toBe('')
 })

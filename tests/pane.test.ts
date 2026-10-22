@@ -1249,11 +1249,23 @@ test('j/k move a selection through the commit list and l opens the selected comm
 	await ui.press({ key: 'nav-j' })
 	expect(await selected()).toBe('docs: write the readme')
 	await ui.press({ key: 'nav-k' })
-	expect(await selected()).toBe('fix: count untracked files')
+	// Cut to the 40-column test pane.
+	expect(await selected()).toBe('fix: count untracked fil…')
 	await ui.press({ key: 'nav-l' })
 	await clock.settle()
 	const box = JSON.stringify(await ui.find({ key: 'changes' }))
 	expect(box).toContain('← back')
 	expect(box).toContain('fix: count untracked files')
 	await ui.unmount()
+})
+
+test('a long commit subject is cut to its line, so the list never wraps', async ($, on) => {
+	const long = `abc1234\0${'build: '.padEnd(80, 'x')}\0${1_800_000_000 - 60}\0`
+	world(on, { status: CLEAN, log: long }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	const drawnSubjects = (await ui.findAll({ type: 'Text', text: /^build: / })).map((one) => one.text)
+	await ui.unmount()
+	// 40 columns, less the box (4), the hash and a space (8), and the age and its space (3), leave 25 cells.
+	expect(drawnSubjects).toEqual([`build: ${'x'.repeat(17)}…`])
 })

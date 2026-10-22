@@ -20,7 +20,7 @@ import { USAGE_LABEL, USAGE_SEPARATOR, bar, barWidth, level, modelName, percentL
 import { rowIcon } from './icons'
 import { cutDiff, drawDiff, drawRows } from './rows'
 import type { RowSpec } from './rows'
-import { shortAge } from './commits'
+import { fitSubject, shortAge } from './commits'
 import { bashChangedFiles, countsLabel, fileRow, summarize } from './summary'
 import {
 	BRANCH_ICON,
@@ -674,7 +674,7 @@ export const register: Register = (on, options) => {
 		)
 		const state = await read($, turn)
 		const title = (
-			<Box justifyContent="center">
+			<Box justifyContent="center" flexShrink={0}>
 				<Text bold wrap="truncate">
 					{NAME}
 					<Text dimColor>{' · '}</Text>
@@ -787,7 +787,7 @@ export const register: Register = (on, options) => {
 		const commit = await read($, viewing)
 		// The keys are always listed in a repo, so the way around (the tree, the commits, the commands) is never hidden.
 		const hints = (
-			<Box flexDirection="column" alignItems="center" marginTop={1}>
+			<Box flexDirection="column" alignItems="center" marginTop={1} flexShrink={0}>
 				<Box flexDirection="row">
 					{commandView ? (
 						<elements.Button
@@ -983,7 +983,14 @@ export const register: Register = (on, options) => {
 												>
 													<Text dimColor>{`${recent.sha} `}</Text>
 													<Text inverse={recent.sha === selectedCommit && !hoverBackground}>
-														{recent.subject}
+														{fitSubject(
+															recent.subject,
+															innerColumns -
+																recent.sha.length -
+																1 -
+																shortAge(now, recent.time).length -
+																1,
+														)}
 													</Text>
 												</elements.Button>
 												<Text dimColor>{` ${shortAge(now, recent.time)}`}</Text>
