@@ -14,6 +14,8 @@ type World = {
 	diffs?: Record<string, string>
 	ran?: string[][]
 	surfaces?: ('terminal' | 'desktop' | 'vscode' | 'mobile')[]
+	log?: string
+	logExit?: number
 }
 
 const PANE = {
@@ -61,6 +63,7 @@ function world(on: On, w: World, opens: string[]) {
 		if (argv.includes('refs/stash')) return done(w.hasStash ? 0 : 1)
 		if (argv.includes('--show-toplevel')) return done(0, '/repo\n')
 		w.ran?.push(argv)
+		if (argv.includes('log')) return done(w.logExit ?? 0, w.log ?? '')
 		if (argv.includes('diff') && !argv.includes('--numstat')) return done(0, w.diffs?.[argv.at(-1) ?? ''] ?? '')
 		if (argv.includes('--no-index')) return done(1, w.untracked?.[argv.at(-1) ?? ''] ?? '')
 		if (argv.includes('diff')) return done(0, w.numstat ?? '')
@@ -1107,4 +1110,59 @@ test('the pane opens by itself when a terminal is attached alongside mobile', as
 	world(on, { status: STATUS, surfaces: ['terminal', 'mobile'] }, opens)
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	expect(opens).toEqual(['sideline'])
+})
+
+const CLEAN = ['# branch.oid 0123456789abcdef', '# branch.head main', ''].join('\0')
+// Three commits, an hour, a day and a week before the world's clock.
+const LOG = [
+	['abc1234', 'feat: draw the tree', 1_800_000_000 - 3_600],
+	['def5678', 'fix: count untracked files', 1_800_000_000 - 86_400],
+	['0a1b2c3', 'docs: write the readme', 1_800_000_000 - 604_800],
+]
+	.map(([sha, subject, seconds]) => `${sha}\0${subject}\0${seconds}\0`)
+	.join('\n')
+
+test('with no changes the box lists the recent commits under no changes', async ($, on) => {
+	world(on, { status: CLEAN, log: LOG }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	const box = JSON.stringify(await ui.find({ key: 'changes' }))
+	await ui.unmount()
+	expect(box).toContain('no changes')
+	expect(box).toContain('abc1234 ')
+	expect(box).toContain('feat: draw the tree')
+	expect(box).toContain(' 1h')
+	expect(box).toContain(' 1d')
+	expect(box).toContain(' 1w')
+})
+
+test('a short pane lists only the commits that fit', async ($, on) => {
+	world(on, { status: CLEAN, log: LOG }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	// 18 rows, less the title and the box's border (3), SESSION (4) and COMMANDS (7), leave 4 content rows with no
+	// hints: no changes, a blank, and two commits.
+	const ui = await $.ui.mount({
+		...PANE,
+		surface: 'terminal',
+		props: { ...PANE.props, scroll: { offset: 0, bodyRows: 18 } },
+	})
+	const box = JSON.stringify(await ui.find({ key: 'changes' }))
+	await ui.unmount()
+	expect(box).toContain('abc1234')
+	expect(box).toContain('def5678')
+	expect(box).not.toContain('0a1b2c3')
+})
+
+test('a repo with no commits reads no commits yet', async ($, on) => {
+	world(on, { status: CLEAN, logExit: 128 }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	expect(await drawn($, 'terminal')).toContain('no commits yet')
+})
+
+test('with changes no git log runs and no commits show', async ($, on) => {
+	const ran: string[][] = []
+	world(on, { status: STATUS, log: LOG, ran }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	expect(ran.some((argv) => argv.includes('log'))).toBe(false)
+	expect(await drawn($, 'terminal')).not.toContain('abc1234')
 })

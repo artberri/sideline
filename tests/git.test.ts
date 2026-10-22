@@ -1,6 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
-import { parseNumstat, parseStatus } from '../hooks/git'
+import { shortAge } from '../hooks/commits'
+import { parseLog, parseNumstat, parseStatus } from '../hooks/git'
 import { lighten, rowDotFor, statusSymbols } from '../hooks/symbols'
 
 const NUL = '\0'
@@ -115,4 +116,23 @@ test('rowDotFor matches Claude Code: ⏺ on macOS, ● elsewhere', () => {
 	expect(rowDotFor('Darwin\n')).toBe('⏺')
 	expect(rowDotFor('Linux\n')).toBe('●')
 	expect(rowDotFor('')).toBe('●')
+})
+
+test('parseLog reads each commit line, and nothing from an empty log', () => {
+	const line = (fields: string[]) => `${fields.join(NUL)}${NUL}`
+	const log = [line(['abc1234', 'feat: x', '1800000000']), line(['def5678', 'fix: y · z', '1799990000'])].join('\n')
+	expect(parseLog(`${log}\n`)).toEqual([
+		{ sha: 'abc1234', subject: 'feat: x', time: 1_800_000_000_000 },
+		{ sha: 'def5678', subject: 'fix: y · z', time: 1_799_990_000_000 },
+	])
+	expect(parseLog('')).toEqual([])
+})
+
+test('shortAge is the largest whole unit, now under a minute', () => {
+	const now = 1_800_000_000_000
+	expect(shortAge(now, now - 30_000)).toBe('now')
+	expect(shortAge(now, now - 5 * 60_000)).toBe('5m')
+	expect(shortAge(now, now - 2 * 3_600_000)).toBe('2h')
+	expect(shortAge(now, now - 3 * 86_400_000)).toBe('3d')
+	expect(shortAge(now, now - 400 * 86_400_000)).toBe('1y')
 })

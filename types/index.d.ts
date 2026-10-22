@@ -18,6 +18,9 @@ export type LineCounts = { added: number; deleted: number; isBinary: boolean }
 
 export type ChangedFile = LineCounts & { path: string; status: FileStatus; isUntracked: boolean }
 
+// A recent commit, listed while nothing is changed: its short hash, subject, and commit time in ms.
+export type Commit = { sha: string; subject: string; time: number }
+
 export type Snapshot =
 	| { kind: 'loading' }
 	| { kind: 'none' }
@@ -28,6 +31,8 @@ export type Snapshot =
 			isDetached: boolean
 			status: BranchStatus
 			files: ChangedFile[]
+			// The most recent commits, read only while `files` is empty.
+			commits: Commit[]
 	  }
 
 // A file Claude is editing (`running`) or just finished editing (`done`, shown as a flash until it expires), by

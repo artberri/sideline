@@ -18,6 +18,7 @@ import { USAGE_LABEL, USAGE_SEPARATOR, bar, barWidth, level, modelName, percentL
 import { rowIcon } from './icons'
 import { cutDiff, drawDiff, drawRows } from './rows'
 import type { RowSpec } from './rows'
+import { shortAge } from './commits'
 import { bashChangedFiles, countsLabel, fileRow, summarize } from './summary'
 import {
 	BRANCH_ICON,
@@ -833,6 +834,7 @@ export const register: Register = (on, options) => {
 			hunks: diffView.hunks === '' ? '' : diffLines.slice(offset, offset + shownRows).join('\n') + '\n',
 		}
 		const windowTree = rows.slice(offset, offset + shownRows)
+		const now = await $.clock.now()
 		return fill(
 			<Box flexDirection="column" flexGrow={1}>
 				{title}
@@ -862,7 +864,21 @@ export const register: Register = (on, options) => {
 									</Box>
 								</Box>
 							) : rows.length === 0 && !diffView ? (
-								<Text dimColor>no changes</Text>
+								<Box flexDirection="column">
+									<Text dimColor>no changes</Text>
+									<Box flexDirection="column" marginTop={1}>
+										{shown.commits.length === 0 && <Text dimColor>no commits yet</Text>}
+										{shown.commits.slice(0, Math.max(0, shownRows - 2)).map((commit) => (
+											<Box key={`commit-${commit.sha}`} justifyContent="space-between">
+												<Text wrap="truncate-end">
+													<Text dimColor>{`${commit.sha} `}</Text>
+													{commit.subject}
+												</Text>
+												<Text dimColor>{` ${shortAge(now, commit.time)}`}</Text>
+											</Box>
+										))}
+									</Box>
+								</Box>
 							) : HAS_CLIENT.has(e.surface) && 'Client' in elements ? (
 								<elements.Client
 									key="rows"

@@ -1,6 +1,6 @@
 import type { EngineInterface } from 'claude-code'
 
-import type { BranchStatus, ChangedFile, FileStatus, LineCounts, Snapshot } from '../types'
+import type { BranchStatus, ChangedFile, Commit, FileStatus, LineCounts, Snapshot } from '../types'
 
 type RepoSnapshot = Extract<Snapshot, { kind: 'repo' }>
 
@@ -82,7 +82,15 @@ export function parseStatus(stdout: string): RepoSnapshot {
 		}
 	}
 	const isDetached = head === '(detached)'
-	return { kind: 'repo', root: '', branch: isDetached ? oid.slice(0, 7) : head, isDetached, status, files }
+	return {
+		kind: 'repo',
+		root: '',
+		branch: isDetached ? oid.slice(0, 7) : head,
+		isDetached,
+		status,
+		files,
+		commits: [],
+	}
 }
 
 // `git diff --numstat -z`: `added\tdeleted\tpath\0`, or `added\tdeleted\t\0from\0to\0` for a rename (and for
@@ -131,6 +139,18 @@ async function untrackedCounts($: EngineInterface, cwd: string, files: ChangedFi
 	return counts
 }
 
+// How many recent commits are read; the pane draws as many as its changes box fits.
+const LOG_LIMIT = 50
+
+// `git log --format=%h%x00%s%x00%ct%x00`: one commit per line, its short hash, subject and commit time in seconds.
+export function parseLog(stdout: string): Commit[] {
+	return stdout.split('\n').flatMap((line) => {
+		const [sha, subject, seconds] = line.split('\0')
+		if (!sha || subject === undefined || !seconds) return []
+		return [{ sha, subject, time: Number(seconds) * 1000 }]
+	})
+}
+
 export async function readSnapshot($: EngineInterface, cwd: string): Promise<Snapshot> {
 	const run = await git($, cwd, ['status', '--porcelain=v2', '--branch', '-z', '--untracked-files=all'])
 	if (run.exitCode !== 0) return { kind: 'none' }
@@ -143,6 +163,11 @@ export async function readSnapshot($: EngineInterface, cwd: string): Promise<Sna
 	const counts = tracked.exitCode === 0 ? parseNumstat(tracked.stdout) : new Map<string, LineCounts>()
 	for (const [path, one] of await untrackedCounts($, cwd, snapshot.files)) counts.set(path, one)
 	snapshot.files = snapshot.files.map((file) => ({ ...file, ...counts.get(file.path) }))
+	if (snapshot.files.length === 0) {
+		// A repo with no commits yet fails `git log`; that is an empty list too.
+		const log = await git($, cwd, ['log', `-n${LOG_LIMIT}`, '--format=%h%x00%s%x00%ct%x00'])
+		snapshot.commits = log.exitCode === 0 ? parseLog(log.stdout) : []
+	}
 	return snapshot
 }
 
