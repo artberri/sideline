@@ -21,6 +21,7 @@ const FLASH_MS = 100
 const MIN_SHIMMER_MS = 1_200
 // Claude Code's own result gutter, which a row drawn in place of a ToolResult does not get.
 const RESULT_GUTTER = '  ⎿  '
+const ANSWERS_HEADER = "User answered Claude's questions"
 const FOCUS_HINT = 'click or ctrl+x tab to focus · esc prompt'
 const DOWN = new Set(['j', 'down'])
 const UP = new Set(['k', 'up'])
@@ -279,6 +280,19 @@ export const register: Register = (on, options) => {
 					<Text dimColor>● </Text>
 					{description}
 				</Text>
+			</Box>
+		)
+	})
+
+	// The person just picked the answers, so the row keeps its header and drops the question → answer lines. It is drawn
+	// here: handed empty questions, the engine draws no row at all.
+	on('ui.render', { component: 'ToolResult' }, async ($, e, next) => {
+		const { tool, isErrored, isExpanded } = e.props
+		if (!isHidingCommands || tool !== 'AskUserQuestion' || isErrored || isExpanded === true) return next(e)
+		const { Box, Text } = $.ui.resolve(e)
+		return (
+			<Box marginTop={1}>
+				<Text>{`● ${ANSWERS_HEADER}`}</Text>
 			</Box>
 		)
 	})

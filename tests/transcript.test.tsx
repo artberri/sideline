@@ -328,3 +328,36 @@ test(
 		expect(await drawnGroup($, [longCall])).toContain('engine group')
 	},
 )
+
+const ANSWERS = {
+	questions: [{ question: 'Which footer?', header: 'Footer', options: [{ label: 'Running' }], multiSelect: false }],
+	answers: { 'Which footer?': 'Only while running' },
+	annotations: { 'Which footer?': { notes: 'keep it short' } },
+}
+
+// The engine's answers row, standing in for Claude Code's: it shows the questions and answers it was handed.
+function answersWorld(on: On) {
+	on('session.cwd', () => ({ value: CWD }))
+	on('ui.render', { component: 'ToolResult' }, ($, e) => {
+		const { Text } = $.ui.resolve(e)
+		return <Text>{`User answered Claude's questions: ${JSON.stringify(e.props.output)}`}</Text>
+	})
+}
+
+test('the answers row keeps its header without the questions', async ($, on) => {
+	answersWorld(on)
+	const text = await drawnResult($, 'AskUserQuestion', ANSWERS)
+	expect(text).toContain("● User answered Claude's questions")
+	expect(text).not.toContain('Which footer?')
+	expect(text).not.toContain('Only while running')
+})
+
+test('ctrl+o shows the answers', async ($, on) => {
+	answersWorld(on)
+	expect(await drawnResult($, 'AskUserQuestion', ANSWERS, { isExpanded: true })).toContain('Only while running')
+})
+
+test('transcriptCommands: show keeps the answers', { options: { transcriptCommands: 'show' } }, async ($, on) => {
+	answersWorld(on)
+	expect(await drawnResult($, 'AskUserQuestion', ANSWERS)).toContain('Only while running')
+})

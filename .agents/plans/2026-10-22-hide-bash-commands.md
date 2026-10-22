@@ -16,16 +16,16 @@ the bottom of vacuo's pane, while it runs.
   no description, is drawn as Claude Code draws it; vacuo never makes up a description. — _proved by:_ `tests/transcript.test.tsx` › isLongCommand is true for a newline or past 80 characters; a short command, or one without a description, keeps its row
 - **B4.** An errored or interrupted Bash call is drawn as Claude Code draws it. — _proved by:_ `tests/transcript.test.tsx` › an errored or interrupted row keeps its command
 - **B5.** The "User answered Claude's questions" row shows its header line only, without the questions and answers
-  under it. — _proved by:_
+  under it. — _proved by:_ `tests/transcript.test.tsx` › the answers row keeps its header without the questions
 - **B6.** While a folded group of calls is live and its current call is a Bash call with a description (any length),
   the group's line shows the description with no `$ command` under it; once the group is done it reads `Ran N shell
   commands` as before. — _proved by:_ `tests/transcript.test.tsx` › a live group running a long described command draws the description, not the command; a live group hides a short described command too; a finished group draws the engine line
 - **B7.** A live group whose running call is not Bash (a Read, a Grep) is drawn as Claude Code draws it. — _proved by:_ `tests/transcript.test.tsx` › a live group running a Read, or not calls-only, draws the engine line
 - **B8.** While a Bash command runs, the bottom of the pane shows it dimmed as `$ <command>`, cut to the pane's width;
   the line is gone once no Bash command is running. — _proved by:_ `tests/pane.test.ts` › a running Bash command shows at the bottom of the pane until it ends; a long command line is cut to the pane width; commandLines shows up to three lines, cut to the width, and counts the rest
-- **B9.** The ctrl+o view shows every command and answer in full. — _proved by:_ `tests/transcript.test.tsx` › ctrl+o shows the command (Bash rows)
+- **B9.** The ctrl+o view shows every command and answer in full. — _proved by:_ `tests/transcript.test.tsx` › ctrl+o shows the command (Bash rows); ctrl+o shows the answers
 - **B10.** With the `transcriptCommands` option set to `show`, the transcript shows commands and answers as Claude
-  Code draws them, and the pane has no command line. — _proved by:_ `tests/transcript.test.tsx` › transcriptCommands: show keeps the command (Bash rows)
+  Code draws them, and the pane has no command line. — _proved by:_ `tests/transcript.test.tsx` › transcriptCommands: show keeps the command (Bash rows); transcriptCommands: show keeps the answers
 
 ## Context
 
@@ -76,8 +76,8 @@ the bottom of vacuo's pane, while it runs.
   "A hook that draws a group of its own calls in its own way checks [`isCallsOnly`] is true."
 - `Bash` input: `command`, `description?` (`.claude-plugin/types/claude-code-tools/index.d.ts`).
 - `AskUserQuestion` result: `questions[]` with `question`, `header`, …, plus the answers
-  (`BuiltinToolResults['AskUserQuestion']`). Which component draws the `⎿ · question → answer` lines (`ToolUse` or
-  `ToolResult`) is checked in Phase 2.
+  (`BuiltinToolResults['AskUserQuestion']`), with `answers` and `annotations` keyed by question. Seen with a probe: the
+  `⎿ · question → answer` lines are the `ToolResult`, drawn from `output.questions` and `output.answers`.
 - The `ToolProgress` row (`(ctrl+b to run in background)`) stays as it is.
 
 ### Key files
@@ -129,24 +129,25 @@ alone while running, under a new `transcriptCommands` option.
       `pane.test.ts` makes `tsc` hit TS2589 on its first `$.tool.call`).
 - [x] Run `bun run format` and `bun run check`.
 
-## Phase 2: Fold the answers to Claude's questions into one line
+## Phase 2: Fold the answers to Claude's questions into one line ✅
 
 **Description:** The "User answered Claude's questions" row keeps its header and drops the question → answer lines.
 
 **Test Checklist:**
 
-- [ ] Transcript test (B5): an `AskUserQuestion` row draws the header without the questions.
-- [ ] Transcript test (B9, B10): expanded, and with `show`, it draws the engine's row.
-- [ ] Manual, live session (B5): the header line looks as the engine's did.
+- [x] Transcript test (B5): an `AskUserQuestion` row draws the header without the questions.
+- [x] Transcript test (B9, B10): expanded, and with `show`, it draws the engine's row.
+- [x] Manual, live session (B5): the header line looks as the engine's did.
 
 **To-do:**
 
-- [ ] Find which component draws the answer lines (`ToolUse` or `ToolResult` for `AskUserQuestion`) with a hook that
+- [x] Find which component draws the answer lines (`ToolUse` or `ToolResult` for `AskUserQuestion`) with a hook that
       logs its props in a live session.
-- [ ] Hook that component for `AskUserQuestion` and draw the header alone, with the result gutter where the engine had
-      one.
-- [ ] Write the tests above.
-- [ ] Run `bun run format` and `bun run check`.
+- [x] Hook that component for `AskUserQuestion` and draw the header alone, after a blank line, as
+      `● User answered Claude's questions` (no colon, since nothing follows). A rewrite with empty `questions` and
+      `answers` was tried first: the engine then drew no row at all.
+- [x] Write the tests above.
+- [x] Run `bun run format` and `bun run check`.
 
 ## Phase 3: Hide the command under the live group line ✅
 
@@ -198,10 +199,9 @@ alone while running, under a new `transcriptCommands` option.
 
 ## Follow-ups
 
-- **`tsc` fails on the first `$.tool.call` it checks** (TS2589 at `tests/pane.test.ts:194`) once a test file sorts
-  before `pane.test.ts`; typing the call's argument doesn't help. Order-dependent, so any new early test file trips it.
-- **Other tools with long inputs** (Agent prompts, MCP calls) could fold the same way.
+Moved to [.agents/follow-ups.md](../follow-ups.md): other tools' long inputs, and the `tsc` failure that depends on
+test file order.
 
 ## Next step
 
-Phase 4: live check that the footer sits at the bottom of the pane while a command runs; then Phase 2.
+Phase 4: live check of the pane footer; then the plan is done.
