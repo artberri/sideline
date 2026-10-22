@@ -70,7 +70,7 @@ async function drawnResult(
 	extra: { isExpanded?: boolean; isErrored?: boolean } = {},
 ) {
 	const ui = await $.ui.mount({
-		plugin: 'vacuo',
+		plugin: 'sideline',
 		surface: 'terminal',
 		component: 'ToolResult',
 		requestId: 'toolu_1',
@@ -135,7 +135,7 @@ test('transcriptDiffs: show keeps the engine diff', { options: { transcriptDiffs
 	expect(await drawnResult($, 'Edit', EDIT_OUTPUT)).toContain('engine diff')
 })
 
-const LONG = "cd ~/Pets/vacuo2 && python3 - <<'EOF'\np='hooks/symbols.ts'; s=open(p).read()\nEOF"
+const LONG = "python3 - <<'EOF'\np='hooks/symbols.ts'; s=open(p).read()\nEOF"
 const DESCRIPTION = 'Adding hover underline to file rows'
 
 test('isLongCommand is true for a newline or past 80 characters', () => {
@@ -167,7 +167,7 @@ type RowState = { isRunning?: boolean; isErrored?: boolean; isInterrupted?: bool
 
 async function drawnRow($: Engine, input: unknown, state: RowState = {}) {
 	const ui = await $.ui.mount({
-		plugin: 'vacuo',
+		plugin: 'sideline',
 		surface: 'terminal',
 		component: 'ToolUse',
 		requestId: 'toolu_1',
@@ -235,7 +235,7 @@ type GroupState = { isActive?: boolean; isExpanded?: boolean; isCallsOnly?: bool
 
 async function drawnGroup($: Engine, calls: ToolGroupCall[], state: GroupState = {}) {
 	const ui = await $.ui.mount({
-		plugin: 'vacuo',
+		plugin: 'sideline',
 		surface: 'terminal',
 		component: 'ToolGroup',
 		props: {

@@ -1,11 +1,10 @@
-# vacuo
+# sideline
 
 A Claude Code mod: a sidebar pane that shows the current branch with starship-style git status symbols and a tree of
 the changed files, with line counts and a shimmer on the file Claude is editing. A smaller take on
 [claude-code-filetree](https://github.com/data-goblin/claude-code-filetree).
 
-The folder is `vacuo2`, but the plugin's name in `plugin.json` is `vacuo`: settings go under `pluginConfigs` → `vacuo`
-and transcript errors name `vacuo`.
+Settings go under `pluginConfigs` → `sideline`, and transcript errors name `sideline`.
 
 ## Layout
 

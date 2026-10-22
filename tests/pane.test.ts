@@ -16,9 +16,9 @@ type World = {
 }
 
 const PANE = {
-	plugin: 'vacuo',
+	plugin: 'sideline',
 	component: 'Pane',
-	requestId: 'vacuo',
+	requestId: 'sideline',
 	props: {
 		title: 'Changes',
 		isFocused: false,
@@ -46,7 +46,7 @@ function world(on: On, w: World, opens: string[]) {
 	const clock = mock.clock(on, { now: 1_800_000_000_000 })
 	on('session.start', (_, e) => ({ cwd: e.cwd }))
 	on('session.cwd', () => ({ value: '/repo' }))
-	on('command.register', () => ({ value: { command: 'vacuo' } }))
+	on('command.register', () => ({ value: { command: 'sideline' } }))
 	on('ui.open', (_, e) => {
 		opens.push(e.id)
 		return { value: { isPlaced: true } }
@@ -74,18 +74,18 @@ async function drawn($: Engine, surface: 'terminal' | 'desktop') {
 	return text
 }
 
-test('the pane opens at session start and again on /vacuo', async ($, on) => {
+test('the pane opens at session start and again on /sideline', async ($, on) => {
 	const opens: string[] = []
 	world(on, { status: STATUS }, opens)
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
-	expect(opens).toEqual(['vacuo'])
+	expect(opens).toEqual(['sideline'])
 	await $.command.run({
-		command: 'vacuo',
+		command: 'sideline',
 		args: '',
 		origin: { kind: 'composer' },
 		presentation: { isFullscreen: true, columns: 160 },
 	})
-	expect(opens).toEqual(['vacuo', 'vacuo'])
+	expect(opens).toEqual(['sideline', 'sideline'])
 })
 
 test('the header shows the branch and starship symbols, on every surface', async ($, on) => {

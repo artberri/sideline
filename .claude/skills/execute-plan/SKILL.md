@@ -35,7 +35,7 @@ Work through the phase's to-dos in order.
   [claude-code-filetree's tests](https://github.com/data-goblin/claude-code-filetree/tree/main/tests): fake the
   environment once in a helper (`mock.env`, `mock.clock`, canned stdout for each `git` command `$.process.run` gets),
   then assert on what the hooks draw or store. Pure helpers are exported from their module and tested directly.
-- **Check it live.** The mod hot-reloads on save in any session that loads `~/Pets/vacuo2`. When a to-do changes what the
+- **Check it live.** The mod hot-reloads on save in any session that loads the working copy. When a to-do changes what the
   pane shows, ask the user to look, or say what they should see.
 - Don't widen the scope. Anything the phase doesn't cover goes in the summary as a follow-up.
 

@@ -7,7 +7,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 
 export const isLongCommand = (command: string) => command.includes('\n') || command.length > LONG_COMMAND
 
-// A Bash input's command and the model's own description of it; `undefined` without a description, since vacuo never
+// A Bash input's command and the model's own description of it; `undefined` without a description, since sideline never
 // makes one up.
 export function describedCommand(input: unknown): DescribedCommand | undefined {
 	if (!isRecord(input) || typeof input.command !== 'string' || typeof input.description !== 'string') return undefined

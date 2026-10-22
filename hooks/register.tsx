@@ -20,7 +20,7 @@ import {
 import { resolveCursor, treeRows } from './tree'
 import type { TreeRow } from './tree'
 
-const PANE = 'vacuo'
+const PANE = 'sideline'
 const TITLE = 'Changes'
 const POLL_MS = 2_000
 const REFRESH_AFTER = new Set(['Edit', 'Write', 'NotebookEdit', 'Bash'])
@@ -36,13 +36,13 @@ const UP = new Set(['k', 'up'])
 const OPEN = new Set(['l', 'right', 'return'])
 const BACK = new Set(['h', 'left', 'backspace'])
 
-const snapshot = atom({ plugin: 'vacuo', key: 'snapshot' } as const, { kind: 'loading' } as Snapshot)
-const glyphs = atom({ plugin: 'vacuo', key: 'glyphs' } as const, 'plain')
-const edits = atom({ plugin: 'vacuo', key: 'edits' } as const, [] as ActiveEdit[])
-const selected = atom({ plugin: 'vacuo', key: 'selected' } as const, null as string | null)
-const diff = atom({ plugin: 'vacuo', key: 'diff' } as const, null as FileDiff | null)
-const cursor = atom({ plugin: 'vacuo', key: 'cursor' } as const, null as Cursor | null)
-const running = atom({ plugin: 'vacuo', key: 'running' } as const, [] as RunningCommand[])
+const snapshot = atom({ plugin: 'sideline', key: 'snapshot' } as const, { kind: 'loading' } as Snapshot)
+const glyphs = atom({ plugin: 'sideline', key: 'glyphs' } as const, 'plain')
+const edits = atom({ plugin: 'sideline', key: 'edits' } as const, [] as ActiveEdit[])
+const selected = atom({ plugin: 'sideline', key: 'selected' } as const, null as string | null)
+const diff = atom({ plugin: 'sideline', key: 'diff' } as const, null as FileDiff | null)
+const cursor = atom({ plugin: 'sideline', key: 'cursor' } as const, null as Cursor | null)
+const running = atom({ plugin: 'sideline', key: 'running' } as const, [] as RunningCommand[])
 
 const STATUS_COLOR: Record<FileStatus, Color> = {
 	added: 'success',
@@ -209,7 +209,7 @@ export const register: Register = (on, options) => {
 	const isHidingCommands = options.transcriptCommands !== 'show'
 
 	on('session.start', async ($, e, next) => {
-		await $.command.register({ name: 'vacuo', description: 'Show the changed-files pane' })
+		await $.command.register({ name: 'sideline', description: 'Show the changed-files pane' })
 		const resolved = await resolveGlyphs($, options.glyphs)
 		await update($, glyphs, () => resolved)
 		rowDot = await resolveRowDot($)
@@ -219,7 +219,7 @@ export const register: Register = (on, options) => {
 		return next(e)
 	})
 
-	on('command.run', { command: 'vacuo' }, async ($) => {
+	on('command.run', { command: 'sideline' }, async ($) => {
 		await refresh($)
 		await $.ui.open({ id: PANE, title: TITLE })
 		return { text: 'Changes pane opened.' }

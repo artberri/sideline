@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "vacuo",
+      "name": "sideline",
       "devDependencies": {
         "oxfmt": "^0.74.0",
         "oxlint": "^1.89.0",

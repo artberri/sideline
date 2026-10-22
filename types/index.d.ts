@@ -45,7 +45,7 @@ export type Cursor = { id: string; index: number }
 
 declare module 'claude-code' {
 	interface PluginState {
-		vacuo: {
+		sideline: {
 			snapshot: Snapshot
 			glyphs: Glyphs
 			edits: ActiveEdit[]

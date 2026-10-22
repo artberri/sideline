@@ -2,7 +2,7 @@
 
 ## claude-code-filetree
 
-vacuo is a smaller take on [claude-code-filetree](https://github.com/data-goblin/claude-code-filetree) by Kurt
+sideline is a smaller take on [claude-code-filetree](https://github.com/data-goblin/claude-code-filetree) by Kurt
 Buhler (MIT), and leans on it heavily as inspiration and as a reference for how a Claude Code mod is built:
 
 - the idea of a docked sidebar pane that follows what Claude reads and writes, with git status and `+N -N` line
@@ -14,7 +14,7 @@ Buhler (MIT), and leans on it heavily as inspiration and as a reference for how 
 - the shape of the `tool.call` hooks and the shimmer animation in a `Client` module;
 - the test style: one helper that fakes the environment and canned `git` output, then asserts on what the pane draws.
 
-vacuo's code and its icon table are written from scratch; none of filetree's source is copied.
+sideline's code and its icon table are written from scratch; none of filetree's source is copied.
 
 ## Starship
 
@@ -24,5 +24,5 @@ The branch header uses the default symbols and order of [Starship](https://stars
 ## Nerd Fonts
 
 The file-type icons in `hooks/icons.ts` are code points looked up in
-[Nerd Fonts](https://github.com/ryanoasis/nerd-fonts)' `glyphnames.json`. vacuo only names code points; it ships no
+[Nerd Fonts](https://github.com/ryanoasis/nerd-fonts)' `glyphnames.json`. sideline only names code points; it ships no
 font files.

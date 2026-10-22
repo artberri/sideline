@@ -35,7 +35,7 @@ export async function resolveGlyphs($: EngineInterface, option: unknown): Promis
 	}
 }
 
-// The dot Claude Code puts before a row: ⏺ on macOS, ● elsewhere. A row vacuo draws in place of the engine's uses it.
+// The dot Claude Code puts before a row: ⏺ on macOS, ● elsewhere. A row sideline draws in place of the engine's uses it.
 export const rowDotFor = (system: string) => (system.trim() === 'Darwin' ? '⏺' : '●')
 
 export async function resolveRowDot($: EngineInterface): Promise<string> {

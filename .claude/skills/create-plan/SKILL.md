@@ -1,7 +1,7 @@
 ---
 name: create-plan
 description: >-
-    Create a multi-phase implementation plan file in `.agents/plans/` for a feature, refactor or fix of the vacuo
+    Create a multi-phase implementation plan file in `.agents/plans/` for a feature, refactor or fix of the sideline
     Claude Code mod. Use this skill whenever the user wants to plan, design, or scope out a piece of work before
     writing code — including the explicit `/create-plan` invocation, phrasings like "create a plan", "draft a plan",
     "plan out this task", "let's plan this", "write an implementation plan", or when the user describes a non-trivial
@@ -21,13 +21,13 @@ file is the artifact — the conversation before it is where the thinking happen
 **Not every plan needs a file.** Small, single-phase work with no decisions worth recording is better executed than
 written down — Step 4 is the gate where you check that and ask the user.
 
-## What vacuo is
+## What sideline is
 
-vacuo is a Claude Code mod (a plugin with a hooks module) kept in this repository and loaded from the working copy
+sideline is a Claude Code mod (a plugin with a hooks module) kept in this repository and loaded from the working copy
 through `CLAUDE_CODE_PLUGIN_DIRS` in `~/.claude/settings.json`. Saving a file hot-reloads it in any interactive session,
 so a phase is checked by looking at the running session, not only by tests.
 
-- Manifest: `.claude-plugin/plugin.json` (the plugin's `name` is `vacuo`, even though the folder is `vacuo2`).
+- Manifest: `.claude-plugin/plugin.json`.
 - Hooks: `hooks/hooks.json` lists the module, `hooks/register.tsx` exports `register: Register`.
 - Typings: once the mod has loaded, `.claude-plugin/types/claude-code/index.d.ts` is the engine API (generated,
   gitignored). Grep it for the event, noun or element you plan to use; it is ~20,000 lines, so never read it whole.
