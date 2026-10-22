@@ -1,3 +1,8 @@
 {
-	"extends": "./.claude-plugin/types/tsconfig.json"
+	"extends": "./.claude-plugin/types/tsconfig.json",
+	"compilerOptions": {
+		// Leaves out claude-code-mcp: the mod calls no MCP tool, and the union of every connected MCP tool's input made
+		// the first `$.tool.call` tsc checked hit TS2589 (type instantiation excessively deep), depending on file order.
+		"types": ["claude-code", "claude-code-tools"]
+	}
 }
