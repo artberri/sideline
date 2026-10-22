@@ -16,6 +16,17 @@ Buhler (MIT), and leans on it heavily as inspiration and as a reference for how 
 
 sideline's code and its icon table are written from scratch; none of filetree's source is copied.
 
+## claude-flightdeck
+
+The pane's look follows [claude-flightdeck](https://github.com/scasella/claude-flightdeck) by Stephen Casella (MIT):
+
+- the centred title naming the mod and Claude's state (`IDLE`, `WORKING`), read from the main loop's `turn.start`
+  and `turn.complete`;
+- the line under the title (flightdeck's legend; sideline's keyboard hints);
+- each section in its own rounded box in a theme colour, with a caps title.
+
+None of flightdeck's source is copied.
+
 ## Starship
 
 The branch header uses the default symbols and order of [Starship](https://starship.rs)'s `git_branch` and
