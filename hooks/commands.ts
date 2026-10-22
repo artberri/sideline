@@ -15,6 +15,15 @@ export function describedCommand(input: unknown): DescribedCommand | undefined {
 	return description === '' ? undefined : { command: input.command, description }
 }
 
+// The input a Bash row is drawn from with its command hidden: the description in the command's place, so the engine
+// draws `Bash(<description>)` and no `$ command` line. `undefined` when the row keeps its command.
+export function hiddenCommandInput(input: unknown): Record<string, unknown> | undefined {
+	const described = describedCommand(input)
+	if (!isRecord(input) || !described || !isLongCommand(described.command)) return undefined
+	const { description: _, ...rest } = input
+	return { ...rest, command: described.description }
+}
+
 type GroupCall = { tool: string; input: unknown; isRunning: boolean }
 
 // The description a live group's line shows in place of its current Bash call's long command; `undefined` when the

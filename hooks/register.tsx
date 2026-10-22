@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { Color, EngineInterface, Register } from 'claude-code'
 
 import type { ActiveEdit, ChangedFile, Cursor, FileDiff, FileStatus, Snapshot } from '../types'
-import { runningDescription } from './commands'
+import { hiddenCommandInput, runningDescription } from './commands'
 import { readDiff, readSnapshot } from './git'
 import { rowIcon } from './icons'
 import { cutDiff, drawDiff, drawRows } from './rows'
@@ -245,6 +245,13 @@ export const register: Register = (on, options) => {
 			if ('kind' in data && data.kind === 'file') await openFile($, data.press)
 		}
 		return {}
+	})
+
+	on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
+		const { tool, input, isErrored, isInterrupted, isExpanded } = e.props
+		if (!isHidingCommands || tool !== 'Bash' || isErrored || isInterrupted || isExpanded === true) return next(e)
+		const hidden = hiddenCommandInput(input)
+		return hidden ? next({ ...e, props: { ...e.props, input: hidden } }) : next(e)
 	})
 
 	// The live line of a folded group draws its running command under the description, and that text is no prop a

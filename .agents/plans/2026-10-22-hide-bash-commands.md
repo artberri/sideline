@@ -52,7 +52,7 @@ the bottom of vacuo's pane, while it runs.
   description reworded (`Waiting eight seconds, …`) with the `$ command` lines under it. Only calls that change files
   in the repo get a standalone `Bash(…)` row. So Phase 3 (the group line) is what hides the command in most cases.
 - **Phase 1 rewrites the row's `input`** (the description as `command`, no `description` field) and lets the engine
-  draw it, pending the live check of a running and a finished row.
+  draw it: seen live, a file-changing Bash call reads `Bash(<description>)` with its `Updated …` lines.
 
 ### Engine API (checked in the 2.1.306 typings)
 
@@ -90,7 +90,7 @@ the bottom of vacuo's pane, while it runs.
 - **Options:** `transcriptCommands` (`hide` | `show`, default `hide`) in `plugin.json`.
 - **Test suites:** `tests/transcript.test.tsx` (rows, group line, answers), `tests/pane.test.ts` (footer).
 
-## Phase 1: Hide long Bash commands in tool rows
+## Phase 1: Hide long Bash commands in tool rows ✅
 
 **Description:** A described Bash call with a long command shows `Bash(<description>)` once done and the description
 alone while running, under a new `transcriptCommands` option.
@@ -104,12 +104,12 @@ alone while running, under a new `transcriptCommands` option.
 - [x] Transcript test (B4): an errored and an interrupted row draw the engine's row.
 - [x] Transcript test (B9): an expanded row draws the engine's row.
 - [x] Transcript test (B10): `transcriptCommands: show` draws the engine's row.
-- [ ] Manual, live session (B1, B2): the row keeps the engine's dot, colour and `· 2s` timing — a test sees the props,
+- [x] Manual, live session (B1, B2): the row keeps the engine's dot, colour and `· 2s` timing — a test sees the props,
       not the paint.
 
 **To-do:**
 
-- [ ] Spike: in a live session, rewrite `input.command` to the description in a `ToolUse` hook and look at a running
+- [x] Spike: in a live session, rewrite `input.command` to the description in a `ToolUse` hook and look at a running
       and a finished row; if the running row still draws a `$ …` line or the title reads wrong, draw the row in vacuo
       instead (dot, description, timing). Record the choice in Decisions.
 - [x] Add `transcriptCommands` to `userConfig` in `plugin.json`, as `transcriptDiffs` is.
@@ -194,5 +194,4 @@ alone while running, under a new `transcriptCommands` option.
 
 ## Next step
 
-Phase 1: live check of a Bash call that changes repo files (its own `Bash(…)` row), running and finished; the
-hook is written and tested but uncommitted.
+Phase 2: find which component draws the answers to Claude's questions.

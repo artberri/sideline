@@ -2,7 +2,7 @@ import type { On, ToolGroupCall } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
-import { isLongCommand, runningDescription } from '../hooks/commands'
+import { hiddenCommandInput, isLongCommand, runningDescription } from '../hooks/commands'
 import { countPatch, summarize } from '../hooks/summary'
 
 const CWD = '/repo'
@@ -145,7 +145,82 @@ test('isLongCommand is true for a newline or past 80 characters', () => {
 	expect(isLongCommand('a\nb')).toBe(true)
 })
 
+test('hiddenCommandInput puts the description in the command place', () => {
+	expect(hiddenCommandInput({ command: LONG, description: DESCRIPTION, timeout: 5000 })).toEqual({
+		command: DESCRIPTION,
+		timeout: 5000,
+	})
+	expect(hiddenCommandInput({ command: 'git status', description: 'Show status' })).toBeUndefined()
+	expect(hiddenCommandInput({ command: LONG })).toBeUndefined()
+	expect(hiddenCommandInput({ command: LONG, description: '  ' })).toBeUndefined()
+})
+
+// The engine's row, standing in for Claude Code's: it shows the input it was handed.
+function commandWorld(on: On) {
+	on('ui.render', { component: 'ToolUse' }, ($, e) => {
+		const { Text } = $.ui.resolve(e)
+		return <Text>{`engine ${JSON.stringify(e.props.input)}`}</Text>
+	})
+}
+
+type RowState = { isRunning?: boolean; isErrored?: boolean; isInterrupted?: boolean; isExpanded?: boolean }
+
+async function drawnRow($: Engine, input: unknown, state: RowState = {}) {
+	const ui = await $.ui.mount({
+		plugin: 'vacuo',
+		surface: 'terminal',
+		component: 'ToolUse',
+		requestId: 'toolu_1',
+		props: {
+			tool_use_id: 'toolu_1',
+			tool: 'Bash',
+			input,
+			isRunning: state.isRunning ?? false,
+			isErrored: state.isErrored ?? false,
+			isInterrupted: state.isInterrupted ?? false,
+			isExpanded: state.isExpanded ?? false,
+		},
+	})
+	const text = JSON.stringify(await ui.drawn())
+	await ui.unmount()
+	return text
+}
+
 const described = { command: LONG, description: DESCRIPTION }
+
+test('a finished long described Bash row draws the description, not the command', async ($, on) => {
+	commandWorld(on)
+	const text = await drawnRow($, described)
+	expect(text).toContain(DESCRIPTION)
+	expect(text).not.toContain('python3')
+})
+
+test('a running long described Bash row draws no command', async ($, on) => {
+	commandWorld(on)
+	expect(await drawnRow($, described, { isRunning: true })).not.toContain('python3')
+})
+
+test('a short command, or one without a description, keeps its row', async ($, on) => {
+	commandWorld(on)
+	expect(await drawnRow($, { command: 'git status', description: 'Show status' })).toContain('git status')
+	expect(await drawnRow($, { command: LONG })).toContain('python3')
+})
+
+test('an errored or interrupted row keeps its command', async ($, on) => {
+	commandWorld(on)
+	expect(await drawnRow($, described, { isErrored: true })).toContain('python3')
+	expect(await drawnRow($, described, { isInterrupted: true })).toContain('python3')
+})
+
+test('ctrl+o shows the command', async ($, on) => {
+	commandWorld(on)
+	expect(await drawnRow($, described, { isExpanded: true })).toContain('python3')
+})
+
+test('transcriptCommands: show keeps the command', { options: { transcriptCommands: 'show' } }, async ($, on) => {
+	commandWorld(on)
+	expect(await drawnRow($, described)).toContain('python3')
+})
 
 const longCall = { tool: 'Bash', input: described, isRunning: true, isErrored: false, isInterrupted: false }
 
