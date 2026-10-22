@@ -868,8 +868,8 @@ export const register: Register = (on, options) => {
 		const commandRows = commandView ? wrapLines(commandView.command, innerColumns) : []
 		const diffLines = diffView && diffView.hunks !== '' ? diffView.hunks.replace(/\n$/, '').split('\n') : []
 		// A diff or a command keeps its header row and the blank row under it above the window.
-		// An opened commit keeps its header row above everything else in the box.
-		const contentRows = commit ? Math.max(1, windowRows - 1) : windowRows
+		// An opened commit keeps its header row, and a blank row under it, above everything else in the box.
+		const contentRows = commit ? Math.max(1, windowRows - 2) : windowRows
 		const shownRows = commandView || diffView ? Math.max(1, contentRows - 2) : contentRows
 		const lineCount = commandView ? commandRows.length : diffView ? diffLines.length : rows.length
 		changesWindow = { lines: lineCount, rows: shownRows }
@@ -895,7 +895,7 @@ export const register: Register = (on, options) => {
 							</Box>
 						)}
 						{commit && (
-							<Box flexDirection="row" marginTop={isShowingSession ? 0 : 1}>
+							<Box flexDirection="row" marginTop={isShowingSession ? 0 : 1} marginBottom={1}>
 								<elements.Button
 									key="commit-back"
 									plain
