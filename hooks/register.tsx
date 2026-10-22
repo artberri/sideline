@@ -355,6 +355,28 @@ function titled(
 	)
 }
 
+// PROBE (temporary): how long each tool's input is when its row draws. Names and lengths only, never values.
+const probeRows = new Map<string, { tool: string; length: number; keys: string }>()
+async function probeRow($: EngineInterface, id: string, tool: string, input: unknown): Promise<void> {
+	if (probeRows.has(id)) return
+	const keys = typeof input === 'object' && input !== null ? Object.keys(input).join(',') : typeof input
+	probeRows.set(id, { tool, length: JSON.stringify(input ?? null).length, keys })
+	const byTool = new Map<string, { rows: number; max: number; long: number; keys: Set<string> }>()
+	for (const row of probeRows.values()) {
+		const one = byTool.get(row.tool) ?? { rows: 0, max: 0, long: 0, keys: new Set<string>() }
+		one.rows++
+		one.max = Math.max(one.max, row.length)
+		if (row.length > 120) one.long++
+		for (const key of row.keys.split(',')) one.keys.add(key)
+		byTool.set(row.tool, one)
+	}
+	const lines = [...byTool].map(
+		([name, one]) =>
+			`${name}\trows=${one.rows}\tlong(>120)=${one.long}\tmax=${one.max}\tkeys=${[...one.keys].join(',')}`,
+	)
+	await $.fs.write(`${$.plugin.root}/.probe.log`, lines.sort().join('\n') + '\n').catch(() => undefined)
+}
+
 export const register: Register = (on, options) => {
 	const background = backgroundOption(options.background)
 	const hoverBackground = background ? lighten(background) : null
@@ -504,6 +526,12 @@ export const register: Register = (on, options) => {
 
 	// A finished Edit or Write row carries its counts on its title line, and its result line (the same path again) is
 	// drawn as nothing below.
+	// PROBE (temporary)
+	on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
+		if (!e.props.isRunning) await probeRow($, e.props.tool_use_id, e.props.tool, e.props.input)
+		return next(e)
+	})
+
 	on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
 		const { tool, output, isRunning, isErrored, isInterrupted, isExpanded } = e.props
 		const isFileTool = tool === 'Edit' || tool === 'Write'
