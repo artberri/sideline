@@ -1,0 +1,45 @@
+name: Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check (Claude Code ${{ matrix.claude }})
+    runs-on: ubuntu-latest
+    # The pinned build has to pass; the latest one only warns when a new Claude Code changes the mod API.
+    continue-on-error: ${{ matrix.claude == 'latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        claude: ['2.1.308', latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the Bun version from .prototools
+        id: bun
+        run: echo "version=$(sed -n 's/^bun = "\(.*\)"$/\1/p' .prototools)" >> "$GITHUB_OUTPUT"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ steps.bun.outputs.version }}
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run format:check
+
+      - run: bun run lint
+
+      - name: Install Claude Code ${{ matrix.claude }}
+        run: npm install --global "@anthropic-ai/claude-code@${{ matrix.claude }}"
+
+      # tsc is left out: its typings are written by Claude Code only when a live session loads the mod.
+      - run: bun run validate
+
+      - run: bun run test

@@ -50,6 +50,9 @@ bun run check       # oxfmt --check, oxlint, tsc -p ., claude plugin validate .,
 
 `tsc -p .` needs the generated typings, so the mod must have loaded once.
 
+CI (`.github/workflows/check.yml`) runs the same checks but `tsc` on every push and pull request to `main`, against
+the pinned Claude Code build and the latest one; only the pinned one has to pass. To move the pin, change it there.
+
 ## Conventions
 
 - TypeScript, strictly typed, no `any`. Small modules under `hooks/` with pure helpers exported so tests can reach
