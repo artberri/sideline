@@ -276,10 +276,12 @@ export const register: Register = (on, options) => {
 	})
 
 	// The live line of a folded group draws a command under the description, and that text is no prop a rewrite
-	// reaches, so the line is drawn here.
+	// reaches, so the line is drawn here. Not only for a calls-only group: a nested CLAUDE.md the group loaded or a hook
+	// row turns that off, and the engine still prints the command. Those rows come back once the group folds.
 	on('ui.render', { component: 'ToolGroup' }, async ($, e, next) => {
-		const { calls, isActive, isExpanded, isCallsOnly } = e.props
-		if (!isHidingCommands || !isActive || isExpanded || isCallsOnly !== true) return next(e)
+		const { calls, isActive, isExpanded } = e.props
+		const isFailed = calls.some((call) => call.isErrored || call.isInterrupted)
+		if (!isHidingCommands || !isActive || isExpanded || isFailed) return next(e)
 		const description = runningDescription(calls, lastDescription)
 		if (!description) return next(e)
 		lastDescription = description

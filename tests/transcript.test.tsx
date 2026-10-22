@@ -295,11 +295,21 @@ test('a finished group draws the engine line', async ($, on) => {
 	expect(await drawnGroup($, [{ ...longCall, isRunning: false }], { isActive: false })).toContain('engine group')
 })
 
-test('a live group running a Read, or not calls-only, draws the engine line', async ($, on) => {
+test('a live group running a Read, or with a failed call, draws the engine line', async ($, on) => {
 	groupWorld(on)
 	const read = { ...longCall, tool: 'Read', input: { file_path: '/repo/a.ts' } }
 	expect(await drawnGroup($, [read])).toContain('engine group')
-	expect(await drawnGroup($, [longCall], { isCallsOnly: false })).toContain('engine group')
+	expect(await drawnGroup($, [{ ...longCall, isRunning: false, isErrored: true }, longCall])).toContain(
+		'engine group',
+	)
+	expect(await drawnGroup($, [{ ...longCall, isInterrupted: true }])).toContain('engine group')
+})
+
+test('a live group that loaded a CLAUDE.md or ran a hook still hides the command', async ($, on) => {
+	groupWorld(on)
+	const text = await drawnGroup($, [longCall], { isCallsOnly: false })
+	expect(text).toContain(DESCRIPTION)
+	expect(text).not.toContain('python3')
 })
 
 test('a live group hides a short described command too', async ($, on) => {
