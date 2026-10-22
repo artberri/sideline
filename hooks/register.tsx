@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { ClientElements, Color, EngineInterface, Register } from 'claude-code'
+import type { ClientElements, Color, EngineInterface, Register, ToolCallInput, ToolCallResult } from 'claude-code'
 
 import type {
 	ActiveEdit,
@@ -430,6 +430,84 @@ function titled(
 	)
 }
 
+// Runs the mod's own bookkeeping around a tool call or a site's event, and swallows its errors: it must never stop or
+// change what it watches. `undefined` when it failed.
+async function quietly<T>(work: () => Promise<T>): Promise<T | undefined> {
+	try {
+		return await work()
+	} catch {
+		return undefined
+	}
+}
+
+// What a call started, for its end: a dialog (question, plan) waiting on the person, a logged command, a file edit.
+type NotedCall =
+	| { kind: 'dialog' }
+	| { kind: 'command' }
+	| { kind: 'edit'; edit: ActiveEdit; startedAt: number }
+	| { kind: 'other' }
+
+async function noteCallStart($: EngineInterface, e: ToolCallInput): Promise<NotedCall> {
+	// A question or a plan to approve keeps its call open exactly as long as its dialog waits for the person.
+	if (DIALOG_TOOLS.has(String(e.tool)) && e.agentId === undefined) {
+		await update($, turn, () => 'waiting')
+		return { kind: 'dialog' }
+	}
+	const path = editedPath(e)
+	if (path) {
+		const startedAt = await $.clock.now()
+		const edit: ActiveEdit = { id: e.tool_use_id, path, state: 'running', isNewFile: e.tool === 'Write' }
+		await update($, edits, (list) => [...list.filter((one) => one.path !== path), edit])
+		return { kind: 'edit', edit, startedAt }
+	}
+	if (e.tool === 'Bash') {
+		const id = e.tool_use_id
+		await update($, commands, (list) =>
+			[...list, { id, command: e.command, state: 'running' as const }].slice(-LOG_SIZE),
+		)
+		const kept = new Set((await read($, commands)).map((one) => one.id))
+		await update($, openCommand, (open) => (open !== null && kept.has(open) ? open : null))
+		return { kind: 'command' }
+	}
+	return { kind: 'other' }
+}
+
+// `result` is null when the call threw.
+async function noteCallEnd(
+	$: EngineInterface,
+	e: ToolCallInput,
+	noted: NotedCall | undefined,
+	result: ToolCallResult | null,
+): Promise<void> {
+	if (noted?.kind === 'dialog') {
+		await update($, turn, (state) => (state === 'waiting' ? 'working' : state))
+		return
+	}
+	const isFailed = result === null || Boolean(result.deny) || Boolean(result.isError)
+	if (noted?.kind === 'edit') {
+		if (isFailed) await update($, edits, (list) => list.filter((one) => one.id !== noted.edit.id))
+		else await finishEdit($, noted.edit.id, noted.startedAt)
+		void refresh($)
+		return
+	}
+	if (noted?.kind === 'command') {
+		const output: unknown = result?.result
+		const isInterrupted =
+			typeof output === 'object' && output !== null && 'interrupted' in output && output.interrupted === true
+		const state: LoggedCommand['state'] = isFailed || isInterrupted ? 'failed' : 'done'
+		await update($, commands, (list) => list.map((one) => (one.id === e.tool_use_id ? { ...one, state } : one)))
+	}
+	if (result && e.tool === 'Bash' && !isFailed) {
+		const startedAt = await $.clock.now()
+		for (const file of bashChangedFiles(result.result)) {
+			const edit: ActiveEdit = { id: `${e.tool_use_id}:${file.path}`, state: 'running', ...file }
+			await update($, edits, (list) => [...list.filter((one) => one.path !== file.path), edit])
+			await finishEdit($, edit.id, startedAt)
+		}
+	}
+	if (REFRESH_AFTER.has(String(e.tool))) void refresh($)
+}
+
 export const register: Register = (on, options) => {
 	const background = backgroundOption(options.background)
 	const hoverBackground = background ? lighten(background) : null
@@ -492,56 +570,15 @@ export const register: Register = (on, options) => {
 		return next(e).finally(() => update($, turn, () => 'idle'))
 	})
 
+	// The call itself goes through untouched: the mod's own bookkeeping before and after it is fail-safe, so an error
+	// in it can never stop or change a tool call.
 	on('tool.call', async ($, e, next) => {
-		// A question or a plan to approve keeps its call open exactly as long as its dialog waits for the person.
-		if (DIALOG_TOOLS.has(String(e.tool)) && e.agentId === undefined) {
-			await update($, turn, () => 'waiting')
-			return next(e).finally(() => update($, turn, (state) => (state === 'waiting' ? 'working' : state)))
-		}
-		const path = editedPath(e)
-		if (!path) {
-			const command = e.tool === 'Bash' ? e.command : undefined
-			const id = e.tool_use_id
-			const settle = (state: LoggedCommand['state']) =>
-				update($, commands, (list) => list.map((one) => (one.id === id ? { ...one, state } : one)))
-			if (command !== undefined) {
-				await update($, commands, (list) =>
-					[...list, { id, command, state: 'running' as const }].slice(-LOG_SIZE),
-				)
-				const kept = new Set((await read($, commands)).map((one) => one.id))
-				await update($, openCommand, (open) => (open !== null && kept.has(open) ? open : null))
-			}
-			const result = await next(e).catch(async (error: unknown) => {
-				if (command !== undefined) await settle('failed')
-				throw error
-			})
-			if (command !== undefined) {
-				const output: unknown = result.result
-				const isInterrupted =
-					typeof output === 'object' &&
-					output !== null &&
-					'interrupted' in output &&
-					output.interrupted === true
-				await settle(result.deny || result.isError || isInterrupted ? 'failed' : 'done')
-			}
-			if (e.tool === 'Bash' && !result.deny && !result.isError) {
-				const startedAt = await $.clock.now()
-				for (const file of bashChangedFiles(result.result)) {
-					const edit: ActiveEdit = { id: `${e.tool_use_id}:${file.path}`, state: 'running', ...file }
-					await update($, edits, (list) => [...list.filter((one) => one.path !== file.path), edit])
-					await finishEdit($, edit.id, startedAt)
-				}
-			}
-			if (REFRESH_AFTER.has(String(e.tool))) void refresh($)
-			return result
-		}
-		const startedAt = await $.clock.now()
-		const edit: ActiveEdit = { id: e.tool_use_id, path, state: 'running', isNewFile: e.tool === 'Write' }
-		await update($, edits, (list) => [...list.filter((one) => one.path !== path), edit])
-		const result = await next(e)
-		if (result.deny || result.isError) await update($, edits, (list) => list.filter((one) => one.id !== edit.id))
-		else await finishEdit($, edit.id, startedAt)
-		void refresh($)
+		const noted = await quietly(() => noteCallStart($, e))
+		const result = await next(e).catch(async (error: unknown) => {
+			await quietly(() => noteCallEnd($, e, noted, null))
+			throw error
+		})
+		await quietly(() => noteCallEnd($, e, noted, result))
 		return result
 	})
 
@@ -551,7 +588,9 @@ export const register: Register = (on, options) => {
 		const element = e.element ?? ''
 		const isCommand = element.startsWith(COMMAND_KEY_PREFIX) && element !== 'command-back'
 		if (e.origin.kind === 'person' && !element.startsWith('nav-'))
-			await update($, focusedCommand, () => (isCommand ? element.slice(COMMAND_KEY_PREFIX.length) : null))
+			await quietly(() =>
+				update($, focusedCommand, () => (isCommand ? element.slice(COMMAND_KEY_PREFIX.length) : null)),
+			)
 		return next(e)
 	})
 
@@ -560,8 +599,8 @@ export const register: Register = (on, options) => {
 	on('ui.scroll', { requestId: PANE }, async ($, e) => {
 		if (!isOverCommands(e.pointer?.row, e.bodyRows, commandsBox)) {
 			const { lines, rows } = changesWindow
-			await update($, changesOffset, (offset) =>
-				clampOffset(clampOffset(offset, lines, rows) + e.by, lines, rows),
+			await quietly(() =>
+				update($, changesOffset, (offset) => clampOffset(clampOffset(offset, lines, rows) + e.by, lines, rows)),
 			)
 		}
 		return {}
