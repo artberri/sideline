@@ -29,11 +29,13 @@ type GroupCall = { tool: string; input: unknown; isRunning: boolean }
 // The description a live group's line shows in place of its current Bash call's command; `undefined` for another tool
 // or an undescribed command. Any length: under its line the engine prints the turn's latest command, even one that
 // isn't in the group. The current call is the running one, else the last: a call is not running yet as the group
-// appears, nor any more just before the group folds.
-export function runningDescription(calls: readonly GroupCall[]): string | undefined {
+// appears, nor any more just before the group folds. While the model is still writing the call its input is empty,
+// and the engine shows the previous description with the previous command, so `previous` stands in.
+export function runningDescription(calls: readonly GroupCall[], previous?: string): string | undefined {
 	const running = [...calls].reverse().find((call) => call.isRunning) ?? calls.at(-1)
 	if (!running || running.tool !== 'Bash') return undefined
-	return describedCommand(running.input)?.description
+	const isStreaming = isRecord(running.input) && running.input.command === undefined
+	return isStreaming ? previous : describedCommand(running.input)?.description
 }
 
 // At most this many of a running command's lines show at the bottom of the pane.

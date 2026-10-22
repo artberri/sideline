@@ -45,6 +45,8 @@ const STATUS_COLOR: Record<FileStatus, Color> = {
 
 let refreshing: Promise<void> | null = null
 let isRefreshQueued = false
+// The last description a live group's line showed, for the moment the next call's input is still being written.
+let lastDescription: string | undefined
 
 async function readAndStore($: EngineInterface): Promise<void> {
 	const next = await readSnapshot($, await $.session.cwd())
@@ -266,8 +268,9 @@ export const register: Register = (on, options) => {
 	on('ui.render', { component: 'ToolGroup' }, async ($, e, next) => {
 		const { calls, isActive, isExpanded, isCallsOnly } = e.props
 		if (!isHidingCommands || !isActive || isExpanded || isCallsOnly !== true) return next(e)
-		const description = runningDescription(calls)
+		const description = runningDescription(calls, lastDescription)
 		if (!description) return next(e)
+		lastDescription = description
 		const { Box, Text } = $.ui.resolve(e)
 		// Engine rows keep a blank line above them; a row drawn in their place doesn't get it.
 		return (

@@ -275,6 +275,21 @@ test('a live group draws the description before its call runs and after it ends'
 	expect(await drawnGroup($, [{ ...longCall, isRunning: false }])).toContain(DESCRIPTION)
 })
 
+test('runningDescription keeps the previous description while a call is still being written', () => {
+	const writing = { ...longCall, isRunning: false, input: {} }
+	expect(runningDescription([writing], 'Earlier step')).toBe('Earlier step')
+	expect(runningDescription([writing])).toBeUndefined()
+	expect(runningDescription([{ ...longCall, input: { command: LONG } }], 'Earlier step')).toBeUndefined()
+})
+
+test('a live group keeps the last description while the next command is written', async ($, on) => {
+	groupWorld(on)
+	expect(await drawnGroup($, [longCall])).toContain(DESCRIPTION)
+	const text = await drawnGroup($, [{ ...longCall, isRunning: false, input: {} }])
+	expect(text).toContain(DESCRIPTION)
+	expect(text).not.toContain('engine group')
+})
+
 test('a finished group draws the engine line', async ($, on) => {
 	groupWorld(on)
 	expect(await drawnGroup($, [{ ...longCall, isRunning: false }], { isActive: false })).toContain('engine group')

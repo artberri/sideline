@@ -36,6 +36,9 @@ the bottom of vacuo's pane, while it runs.
 - **A live group hides any described command, short ones too.** Seen live: under the line the engine prints the
   turn's latest command, even one outside the group (a `sed` after a short `grep`), so passing a short call's line
   to the engine leaked the next one.
+- **While the next call is being written, the group line keeps the last description.** Seen live: a Bash call joins
+  the group with an empty input while the model writes it, and the engine's line then shows the previous description
+  with a command under it.
 - **Short one-liners stay** in finished rows. `Bash(git status)` reads fine; a command is "long" when it has a newline
   or is over 80 characters. 80 is a fixed limit since `ToolUse` carries no width.
 - **One option, `transcriptCommands: hide | show`** (default `hide`), next to `transcriptDiffs`, for the Bash rows, the
