@@ -38,8 +38,9 @@ export function runningDescription(calls: readonly GroupCall[], previous?: strin
 	return isStreaming ? previous : describedCommand(running.input)?.description
 }
 
-// The pane's log keeps this many commands, the newest last.
-export const LOG_SIZE = 5
+// The pane's log keeps this many commands, the newest last: as many as the commands box can show (the `commandRows`
+// option's most); the box draws the newest that fit.
+export const LOG_SIZE = 20
 
 // A command as one line of the log: its first non-blank line with whitespace squeezed, after `$ `, cut to `columns`
 // with an ellipsis; a script with more lines ends in one too.

@@ -1269,3 +1269,34 @@ test('a long commit subject is cut to its line, so the list never wraps', async 
 	// 40 columns, less the box (4), the hash and a space (8), and the age and its space (3), leave 25 cells.
 	expect(drawnSubjects).toEqual([`build: ${'x'.repeat(17)}…`])
 })
+
+test(
+	'commandRows: 3 makes the COMMANDS box three lines tall, the newest three',
+	{ options: { commandRows: 3 } },
+	async ($, on) => {
+		const w: World = { status: STATUS }
+		const clock = world(on, w, [])
+		await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+		for (const n of [1, 2, 3, 4]) await $.tool.call({ tool: 'Bash', command: `echo step${n}` })
+		await clock.settle()
+		const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+		const box = await ui.find({ key: 'commands-box' })
+		const text = JSON.stringify(await ui.find({ key: 'commands' }))
+		await ui.unmount()
+		expect(box?.props.height).toBe(5)
+		expect(text).not.toContain('step1')
+		expect(text).toContain('step4')
+	},
+)
+
+test('commandRows: 0 draws no COMMANDS box and no c hint', { options: { commandRows: 0 } }, async ($, on) => {
+	const w: World = { status: STATUS }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	await $.tool.call({ tool: 'Bash', command: 'echo one' })
+	await clock.settle()
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	expect(await ui.find({ key: 'commands' })).toBeUndefined()
+	expect(await ui.find({ key: 'nav-c' })).toBeUndefined()
+	await ui.unmount()
+})

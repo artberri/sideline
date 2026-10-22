@@ -42,6 +42,12 @@
 			"description": "show: a SESSION box at the top of the pane with the branch, the model, the effort, the context used and the 5h and 7d usage; hide: no box, and the branch line is back in the CHANGES box.",
 			"default": "show",
 			"options": ["show", "hide"]
+		},
+		"commandRows": {
+			"type": "number",
+			"title": "Commands box rows",
+			"description": "How many of the latest commands the COMMANDS box at the bottom of the pane shows, 0 to 20; 0 hides the box.",
+			"default": 5
 		}
 	}
 }

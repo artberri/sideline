@@ -32,7 +32,17 @@ import {
 	statusSymbols,
 } from './symbols'
 import { resolveCursor, treeRows } from './tree'
-import { changesRows, clampOffset, hiddenAround, hiddenLabel, isOverCommands, revealOffset, wrapLines } from './window'
+import {
+	changesRows,
+	commandRowsOption,
+	commandsBoxRows,
+	clampOffset,
+	hiddenAround,
+	hiddenLabel,
+	isOverCommands,
+	revealOffset,
+	wrapLines,
+} from './window'
 import type { TreeRow } from './tree'
 
 const PANE = 'sideline'
@@ -109,6 +119,8 @@ let isRefreshQueued = false
 let lastDescription: string | undefined
 // The changes box's last drawn window, which a scroll clamps to: its content's lines and the rows it shows.
 let changesWindow = { lines: 0, rows: 0 }
+// The commands box's lines, from the `commandRows` option; set by register, read by the key handlers.
+let commandLines = 5
 // How many recent commits the changes box last drew, which j/k move through.
 let commitsShown = 0
 // Claude Code's row dot on this machine, read at session start.
@@ -243,7 +255,7 @@ async function focusCommand($: EngineInterface, id: string): Promise<void> {
 
 // In the commands box j/k step through the log, l opens the command, h leaves for the tree.
 async function navigateCommands($: EngineInterface, id: string, key: string): Promise<void> {
-	const ids = (await read($, commands)).map((one) => one.id)
+	const ids = (await read($, commands)).slice(-commandLines).map((one) => one.id)
 	const step = commandStep(
 		ids,
 		id,
@@ -300,6 +312,7 @@ async function navigate($: EngineInterface, key: string): Promise<void> {
 	const focused = await read($, focusedCommand)
 	// c toggles: into the commands box on the newest command, and from there back to the changes box, as h does.
 	if (key === COMMANDS_KEY) {
+		if (commandLines === 0) return
 		const newest = (await read($, commands)).at(-1)
 		if (focused !== null) await navigateCommands($, focused, 'h')
 		else if (newest) await focusCommand($, newest.id)
@@ -421,6 +434,8 @@ export const register: Register = (on, options) => {
 	const hoverBackground = background ? lighten(background) : null
 	const isHidingDiffs = options.transcriptDiffs !== 'show'
 	const isHidingCommands = options.transcriptCommands !== 'show'
+	commandLines = commandRowsOption(options.commandRows)
+	const commandsBox = commandsBoxRows(commandLines)
 	const isShowingSession = options.sessionBox !== 'hide'
 
 	on('session.start', async ($, e, next) => {
@@ -542,7 +557,7 @@ export const register: Register = (on, options) => {
 	// The pane always fits its rows, so the engine never scrolls it: a wheel tick over the changes box moves that box's
 	// own window, and the scroll keys (no pointer) move it too. A tick over the commands box moves nothing.
 	on('ui.scroll', { requestId: PANE }, async ($, e) => {
-		if (!isOverCommands(e.pointer?.row, e.bodyRows)) {
+		if (!isOverCommands(e.pointer?.row, e.bodyRows, commandsBox)) {
 			const { lines, rows } = changesWindow
 			await update($, changesOffset, (offset) =>
 				clampOffset(clampOffset(offset, lines, rows) + e.by, lines, rows),
@@ -722,25 +737,28 @@ export const register: Register = (on, options) => {
 		const isInCommands = (await read($, focusedCommand)) !== null
 		const open = await read($, openCommand)
 		const logColumns = e.props.bodyColumns - BOX_FRAME
-		const log = titled(
-			elements,
-			{ name: 'COMMANDS', color: COMMAND_COLOR, key: 'commands', rows: LOG_SIZE, background },
-			<Box flexDirection="column">
-				{logged.length === 0 && <Text dimColor>no commands yet</Text>}
-				{logged.map((entry) => (
-					<Box key={`log-${entry.id}`} flexDirection="row">
-						<Text color={LOG_GLYPH_COLOR[entry.state]}>{`${LOG_GLYPH[entry.state]} `}</Text>
-						<elements.Button
-							key={`command-${entry.id}`}
-							plain
-							dimColor={entry.state !== 'running' || undefined}
-							label={logLine(entry.command, logColumns - 2)}
-							onPress={() => void toggleCommand($, entry.id)}
-						/>
-					</Box>
-				))}
-			</Box>,
-		)
+		// No box at all with `commandRows` at 0.
+		const log =
+			commandLines > 0 &&
+			titled(
+				elements,
+				{ name: 'COMMANDS', color: COMMAND_COLOR, key: 'commands', rows: commandLines, background },
+				<Box flexDirection="column">
+					{logged.length === 0 && <Text dimColor>no commands yet</Text>}
+					{logged.slice(-commandLines).map((entry) => (
+						<Box key={`log-${entry.id}`} flexDirection="row">
+							<Text color={LOG_GLYPH_COLOR[entry.state]}>{`${LOG_GLYPH[entry.state]} `}</Text>
+							<elements.Button
+								key={`command-${entry.id}`}
+								plain
+								dimColor={entry.state !== 'running' || undefined}
+								label={logLine(entry.command, logColumns - 2)}
+								onPress={() => void toggleCommand($, entry.id)}
+							/>
+						</Box>
+					))}
+				</Box>,
+			)
 		if (shown.kind === 'loading')
 			return fill(
 				<Box flexDirection="column" flexGrow={1}>
@@ -869,8 +887,8 @@ export const register: Register = (on, options) => {
 								label="open"
 								onPress={() => navigate($, 'l')}
 							/>
-							{logged.length > 0 && <Text> </Text>}
-							{logged.length > 0 && (
+							{logged.length > 0 && commandLines > 0 && <Text> </Text>}
+							{logged.length > 0 && commandLines > 0 && (
 								<elements.Button
 									key="nav-c"
 									plain
@@ -892,7 +910,7 @@ export const register: Register = (on, options) => {
 			</Text>
 		)
 		const filesLabel = `${fileCount} file${fileCount === 1 ? '' : 's'}`
-		const windowRows = changesRows(e.props.scroll.bodyRows, true, isShowingSession)
+		const windowRows = changesRows(e.props.scroll.bodyRows, true, isShowingSession, commandsBox)
 		const innerColumns = e.props.bodyColumns - BOX_FRAME
 		const commandRows = commandView ? wrapLines(commandView.command, innerColumns) : []
 		const diffLines = diffView && diffView.hunks !== '' ? diffView.hunks.replace(/\n$/, '').split('\n') : []

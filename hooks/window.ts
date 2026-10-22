@@ -8,20 +8,33 @@ const BRANCH_ROWS = 2
 export const SESSION_ROWS = 2 + 2
 // The hint line under the title, with the blank row above it.
 const HINT_ROWS = 2
-// The commands box: its lines and its border.
-export const COMMANDS_ROWS = LOG_SIZE + 2
+// The commands box's lines when the `commandRows` option says nothing usable.
+export const COMMAND_ROWS_DEFAULT = 5
+const COMMAND_ROWS_MAX = LOG_SIZE
 
-// Whether a wheel tick at body row `row` is over the commands box, the last COMMANDS_ROWS rows of the pane; a scroll
-// key (no row) is not.
-export function isOverCommands(row: number | undefined, bodyRows: number): boolean {
-	return row !== undefined && row >= bodyRows - COMMANDS_ROWS
+// The `commandRows` option as a number of lines: a whole number from 0 to 20, else the default.
+export function commandRowsOption(value: unknown): number {
+	return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= COMMAND_ROWS_MAX
+		? value
+		: COMMAND_ROWS_DEFAULT
+}
+
+// The rows the commands box takes for `lines` lines: those and its border, or none at all when it has no lines.
+export function commandsBoxRows(lines: number): number {
+	return lines === 0 ? 0 : lines + 2
+}
+
+// Whether a wheel tick at body row `row` is over the commands box, the last `boxRows` rows of the pane; a scroll key
+// (no row) is not.
+export function isOverCommands(row: number | undefined, bodyRows: number, boxRows: number): boolean {
+	return row !== undefined && boxRows > 0 && row >= bodyRows - boxRows
 }
 
 // How many content rows the changes box shows in a pane `bodyRows` tall; never below one. The session box above it
 // takes the branch line out of it.
-export function changesRows(bodyRows: number, hasHints: boolean, hasSession: boolean): number {
+export function changesRows(bodyRows: number, hasHints: boolean, hasSession: boolean, commandsRows: number): number {
 	const above = (hasHints ? HINT_ROWS : 0) + (hasSession ? SESSION_ROWS : BRANCH_ROWS)
-	return Math.max(1, bodyRows - CHANGES_CHROME - above - COMMANDS_ROWS)
+	return Math.max(1, bodyRows - CHANGES_CHROME - above - commandsRows)
 }
 
 // An offset kept inside `[0, lines - rows]`, so the window never runs past either end.

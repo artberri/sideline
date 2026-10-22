@@ -7,17 +7,21 @@ import {
 	hiddenAround,
 	hiddenLabel,
 	isOverCommands,
+	commandRowsOption,
+	commandsBoxRows,
 	revealOffset,
 	wrapLines,
 } from '../hooks/window'
 
 test('changesRows leaves the title, hints, the session box or branch line, borders and commands box out', () => {
 	// 40 rows: title 1, hints 2, session box 4, the changes border 2, commands 7.
-	expect(changesRows(40, true, true)).toBe(24)
+	expect(changesRows(40, true, true, 7)).toBe(24)
 	// Without the session box the branch line and its blank row (2) are in the changes box instead.
-	expect(changesRows(40, true, false)).toBe(26)
-	expect(changesRows(40, false, true)).toBe(26)
-	expect(changesRows(5, true, true)).toBe(1)
+	expect(changesRows(40, true, false, 7)).toBe(26)
+	expect(changesRows(40, false, true, 7)).toBe(26)
+	expect(changesRows(5, true, true, 7)).toBe(1)
+	// With no commands box, its 7 rows are the changes box's.
+	expect(changesRows(40, true, true, 0)).toBe(31)
 })
 
 test('clampOffset keeps the window inside the content', () => {
@@ -34,10 +38,19 @@ test('hiddenLabel counts the lines above and below, only the sides that have som
 	expect(hiddenLabel(hiddenAround(0, 4, 10))).toBe('')
 })
 
-test('isOverCommands is true on the last seven rows, false above and for a key', () => {
-	expect(isOverCommands(13, 20)).toBe(true)
-	expect(isOverCommands(12, 20)).toBe(false)
-	expect(isOverCommands(undefined, 20)).toBe(false)
+test('isOverCommands is true on the commands box rows, false above, for a key, and with no box', () => {
+	expect(isOverCommands(13, 20, 7)).toBe(true)
+	expect(isOverCommands(12, 20, 7)).toBe(false)
+	expect(isOverCommands(15, 20, 5)).toBe(true)
+	expect(isOverCommands(14, 20, 5)).toBe(false)
+	expect(isOverCommands(undefined, 20, 7)).toBe(false)
+	expect(isOverCommands(19, 20, 0)).toBe(false)
+})
+
+test('commandRowsOption takes a whole number from 0 to 20, else 5', () => {
+	expect([5, 0, 20, -1, 21, 2.5, 'x', undefined].map(commandRowsOption)).toEqual([5, 0, 20, 5, 5, 5, 5, 5])
+	expect(commandsBoxRows(3)).toBe(5)
+	expect(commandsBoxRows(0)).toBe(0)
 })
 
 test('wrapLines puts $ before the first line and wraps each line at the width', () => {
