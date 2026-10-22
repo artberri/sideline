@@ -20,7 +20,7 @@ jobs:
       matrix:
         claude: ['2.1.308', latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Read the Bun version from .prototools
         id: bun

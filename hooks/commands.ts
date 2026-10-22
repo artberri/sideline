@@ -32,7 +32,7 @@ type GroupCall = { tool: string; input: unknown; isRunning: boolean }
 // appears, nor any more just before the group folds. While the model is still writing the call its input is empty,
 // and the engine shows the previous description with the previous command, so `previous` stands in.
 export function runningDescription(calls: readonly GroupCall[], previous?: string): string | undefined {
-	const running = [...calls].reverse().find((call) => call.isRunning) ?? calls.at(-1)
+	const running = calls.toReversed().find((call) => call.isRunning) ?? calls.at(-1)
 	if (!running || running.tool !== 'Bash') return undefined
 	const isStreaming = isRecord(running.input) && running.input.command === undefined
 	return isStreaming ? previous : describedCommand(running.input)?.description

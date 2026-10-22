@@ -615,7 +615,7 @@ test('the log keeps the last five commands, oldest first', async ($, on) => {
 	expect(text).not.toContain('step1')
 	const at = [2, 3, 4, 5, 6].map((n) => text.indexOf(`step${n}`))
 	expect(at.every((index) => index >= 0)).toBe(true)
-	expect([...at].sort((a, b) => a - b)).toEqual(at)
+	expect(at.toSorted((a, b) => a - b)).toEqual(at)
 })
 
 test('a long command line is cut to the width inside its box', async ($, on) => {
