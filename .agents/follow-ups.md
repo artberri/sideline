@@ -24,6 +24,11 @@ here (or move it into the plan) once it is planned.
 - **`tsc` fails on the first `$.tool.call` it checks.** Any test file that sorts before `tests/pane.test.ts` makes
   `tsc -p .` hit TS2589 at its first `$.tool.call`, even an empty file; typing the call's argument doesn't help. New
   test suites go in a file that sorts after it, until the cause is found. _From: the hide-bash-commands plan._
+- **`WAITING` for permission prompts.** The title can't tell when a permission dialog is open: `tool.check` returns
+  `ask` before any dialog (and in auto mode for calls the classifier decides), the prompt opens after the check
+  ends, and `classic.PermissionRequest` is swallowed by `cc-plugin-sec-default` before sideline. Worth another look
+  if the engine gains an event for a dialog opening and closing. _From: the pane-boxes-and-state plan's Phase 3
+  probe._
 
 ## Ideas
 

@@ -22,8 +22,10 @@ changes (branch, tree, diff) in an orange box and the running command in a grey 
 - **B7.** The command's lines are cut to the width inside the box, so the box never wraps. — _proved by:_ `tests/pane.test.ts` › "a long command line is cut to the width inside its box"
 - **B8.** Each box has a caps title at its top left, `CHANGES` and `COMMAND`: on the border (`╭─ CHANGES ───╮`) when
   the overlay draws cleanly, else as the box's first row. — _proved by:_ `tests/pane.test.ts` › "the branch, the file count and the tree sit in the orange CHANGES box", "a running Bash command shows at the bottom of the pane until it ends"; on the border: manual, live session
-- **B9.** While Claude waits on the person (a permission prompt, a question), the state reads `WAITING`, and goes back
-  to `WORKING` once the tool runs or is refused. — _proved by:_
+- **B9.** While a question or a plan waits for the person's answer on the main loop, the state reads `WAITING`, and
+  goes back to `WORKING` once it's answered. A subagent's question leaves it alone. Permission prompts don't show it
+  (see Context). — _proved by:_ `tests/pane.test.ts` › "the title reads WAITING while a question waits for an answer,
+  then WORKING", "a subagent's question leaves the title WORKING"
 - **B10.** The pane keeps its `background` option behind the boxes, and ctrl+x tab, clicks and the `j k l h` keys
   work as before. — _proved by:_ manual
 
@@ -121,26 +123,38 @@ sits in a grey rounded box titled `COMMAND` at the bottom of the pane.
 - [x] Pass the inner width to `commandLines`, and check rows in `hooks/rows.tsx` don't overflow the box.
 - [x] Run `bun run format` and `bun run check`.
 
-## Phase 3: Show when Claude waits on the person
+## Phase 3: Show when Claude waits on the person ✅
 
-**Description:** The title reads `WAITING` while a permission prompt or a question waits for an answer.
+**Description:** The title reads `WAITING` while a question (`AskUserQuestion`) or a plan to approve (`ExitPlanMode`)
+waits for the person's answer.
+
+**Probe findings (2026-10-22, live):**
+
+- `tool.check` runs inside `tool.call` and resolves in milliseconds, before any dialog: `ask` means "hand it to the
+  mode's decider" (the person in default mode, the classifier in auto mode), so it returned `ask` even for `echo`
+  in auto mode, and `allow` for `Read`.
+- A real permission prompt opened after the check had already ended (`check end` 12.594, `call end` 31.018); the
+  only end the mod sees is the call's, after the command has also run.
+- `classic.PermissionRequest` never reached sideline: `cc-plugin-sec-default` hooks it first and sends it on past
+  the plugins after it.
+- An `AskUserQuestion` call lasts exactly as long as its dialog is open (10 s in the probe), so a question's or a
+  plan's call is a reliable window. Permission prompts are dropped from the rule and left as a follow-up.
 
 **Test Checklist:**
 
-- [ ] Pane test (B9): after a main-loop `tool.check` resolves to `ask`, the title reads `WAITING`; after the call's
-      `tool.call` starts, or the turn completes, it doesn't.
-- [ ] Manual, live session (B9): a real permission prompt and an `AskUserQuestion` — whether `tool.check` resolves
-      before the dialog closes is what the probe finds out.
+- [x] Pane test (B9): a main-loop `AskUserQuestion` call held open reads `WAITING`, `WORKING` once answered.
+- [x] Pane test (B9): one with an `agentId` leaves `WORKING`.
+- [x] Manual, live session (B9): a real question shows `WAITING` and goes back to `WORKING`.
 
 **To-do:**
 
-- [ ] Probe live: log when a main-loop `tool.check` resolves to `ask` and when that call's `tool.call` starts, for a
-      permission prompt, a classifier-allowed call in auto mode and an `AskUserQuestion`.
-- [ ] If the probe shows a usable window, add `'waiting'` to the `turn` atom and set it there (`WAITING` in
-      `warning`); otherwise record what was found in `.agents/follow-ups.md` and drop the rule.
-- [ ] Run `bun run format` and `bun run check`.
+- [x] Probe live: when a main-loop `tool.check` resolves, when the call runs, for a permission prompt, auto mode and
+      an `AskUserQuestion`.
+- [x] Add `'waiting'` to the `turn` atom, set while a main-loop `AskUserQuestion` or `ExitPlanMode` call runs
+      (`WAITING` in `warning`).
+- [x] Record the permission-prompt findings in `.agents/follow-ups.md`.
+- [x] Run `bun run format` and `bun run check`.
 
 ## Next step
 
-Phase 3: probe live when a main-loop `tool.check` resolves to `ask` and when that call runs, then decide whether
-`WAITING` can be shown.
+Done: all three phases are in.

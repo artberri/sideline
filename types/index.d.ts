@@ -40,8 +40,9 @@ export type FileDiff = { path: string; hunks: string }
 // A Bash command Claude is running, by its tool_use_id, shown at the bottom of the pane.
 export type RunningCommand = { id: string; command: string }
 
-// What Claude is doing, as the pane's title shows it: working through a turn, or waiting for a prompt.
-export type TurnState = 'idle' | 'working'
+// What Claude is doing, as the pane's title shows it: working through a turn, waiting on the person's answer to a
+// question or a plan, or waiting for a prompt.
+export type TurnState = 'idle' | 'working' | 'waiting'
 
 // The selected row: its id, and its index so the selection can fall to the nearest row when it leaves the tree.
 export type Cursor = { id: string; index: number }

@@ -49,6 +49,8 @@ const DOWN = new Set(['j', 'down'])
 const UP = new Set(['k', 'up'])
 const OPEN = new Set(['l', 'right', 'return'])
 const BACK = new Set(['h', 'left', 'backspace'])
+// The tools whose call waits on the person: a question, a plan to approve.
+const DIALOG_TOOLS = new Set(['AskUserQuestion', 'ExitPlanMode'])
 
 const snapshot = atom({ plugin: 'sideline', key: 'snapshot' } as const, { kind: 'loading' } as Snapshot)
 const glyphs = atom({ plugin: 'sideline', key: 'glyphs' } as const, 'plain')
@@ -252,6 +254,11 @@ export const register: Register = (on, options) => {
 	})
 
 	on('tool.call', async ($, e, next) => {
+		// A question or a plan to approve keeps its call open exactly as long as its dialog waits for the person.
+		if (DIALOG_TOOLS.has(String(e.tool)) && e.agentId === undefined) {
+			await update($, turn, () => 'waiting')
+			return next(e).finally(() => update($, turn, (state) => (state === 'waiting' ? 'working' : state)))
+		}
 		const path = editedPath(e)
 		if (!path) {
 			const command = isHidingCommands && e.tool === 'Bash' ? e.command : undefined
@@ -375,13 +382,19 @@ export const register: Register = (on, options) => {
 				{body}
 			</Box>
 		)
-		const isWorking = (await read($, turn)) === 'working'
+		const state = await read($, turn)
 		const title = (
 			<Box justifyContent="center">
 				<Text bold wrap="truncate">
 					{NAME}
 					<Text dimColor>{' · '}</Text>
-					{isWorking ? <Text color="claude">WORKING</Text> : <Text dimColor>IDLE</Text>}
+					{state === 'waiting' ? (
+						<Text color="warning">WAITING</Text>
+					) : state === 'working' ? (
+						<Text color="claude">WORKING</Text>
+					) : (
+						<Text dimColor>IDLE</Text>
+					)}
 				</Text>
 			</Box>
 		)

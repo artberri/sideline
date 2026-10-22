@@ -692,3 +692,48 @@ test('outside a git repo the CHANGES box says so', async ($, on) => {
 	expect(JSON.stringify(await ui.find({ key: 'changes' }))).toContain('not a git repo')
 	await ui.unmount()
 })
+
+const QUESTION = {
+	tool: 'AskUserQuestion' as const,
+	questions: [
+		{
+			question: 'Which one?',
+			header: 'Pick',
+			multiSelect: false,
+			options: [
+				{ label: 'A', description: 'The first' },
+				{ label: 'B', description: 'The second' },
+			],
+		},
+	],
+}
+
+test('the title reads WAITING while a question waits for an answer, then WORKING', async ($, on) => {
+	const w: World = { status: STATUS }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	await $.turn.start(TURN)
+	const answer = held(w)
+	const call = $.tool.call(QUESTION)
+	await clock.settle()
+	expect(await drawn($, 'terminal')).toContain('WAITING')
+	answer({ result: {} })
+	await call
+	await clock.settle()
+	const text = await drawn($, 'terminal')
+	expect(text).toContain('WORKING')
+	expect(text).not.toContain('WAITING')
+})
+
+test("a subagent's question leaves the title WORKING", async ($, on) => {
+	const w: World = { status: STATUS }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	await $.turn.start(TURN)
+	const answer = held(w)
+	const call = $.tool.call({ ...QUESTION, agentId: 'a1' })
+	await clock.settle()
+	expect(await drawn($, 'terminal')).not.toContain('WAITING')
+	answer({ result: {} })
+	await call
+})
