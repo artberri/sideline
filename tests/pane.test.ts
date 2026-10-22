@@ -1147,12 +1147,12 @@ test('with no changes the box says so and lists the recent commits under a headi
 test('a short pane lists only the commits that fit', async ($, on) => {
 	world(on, { status: CLEAN, log: LOG }, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
-	// 19 rows, less the title and the box's border (3), SESSION (4) and COMMANDS (7), leave 5 content rows with no
-	// hints: the status line, a blank, the heading, and two commits.
+	// 21 rows, less the title and the box's border (3), the hints (2), SESSION (4) and COMMANDS (7), leave 5 content
+	// rows: the status line, a blank, the heading, and two commits.
 	const ui = await $.ui.mount({
 		...PANE,
 		surface: 'terminal',
-		props: { ...PANE.props, scroll: { offset: 0, bodyRows: 19 } },
+		props: { ...PANE.props, scroll: { offset: 0, bodyRows: 21 } },
 	})
 	const box = JSON.stringify(await ui.find({ key: 'changes' }))
 	await ui.unmount()
@@ -1230,5 +1230,29 @@ test('changes appearing while a commit is open leave the commit on screen', asyn
 	expect(box).toContain('← back')
 	expect(box).toContain('"name":"new.ts"')
 	expect(box).not.toContain('"name":"staged.ts"')
+	await ui.unmount()
+})
+
+test('j/k move a selection through the commit list and l opens the selected commit', async ($, on) => {
+	const clock = world(on, { status: CLEAN, log: LOG, ...COMMIT_WORLD }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	const selected = async () =>
+		(await ui.findAll({ type: 'Text' })).find((text) => (text.props as { inverse?: boolean }).inverse === true)
+			?.text
+	expect(await ui.find({ key: 'nav-j' })).toBeDefined()
+	await ui.press({ key: 'nav-j' })
+	expect(await selected()).toBe('feat: draw the tree')
+	await ui.press({ key: 'nav-j' })
+	await ui.press({ key: 'nav-j' })
+	await ui.press({ key: 'nav-j' })
+	expect(await selected()).toBe('docs: write the readme')
+	await ui.press({ key: 'nav-k' })
+	expect(await selected()).toBe('fix: count untracked files')
+	await ui.press({ key: 'nav-l' })
+	await clock.settle()
+	const box = JSON.stringify(await ui.find({ key: 'changes' }))
+	expect(box).toContain('← back')
+	expect(box).toContain('fix: count untracked files')
 	await ui.unmount()
 })

@@ -18,7 +18,7 @@ and `h` or `← back` steps out one level at a time.
 - **B4.** Changes appearing while a commit is open don't pull the box away; it shows the working changes once you step
   back out of the commit. — _proved by:_ `tests/pane.test.ts` › "changes appearing while a commit is open leave the commit on screen"
 - **B5.** `j`/`k` move through the commit list and `l` opens the selected commit; the selection stays in the box's
-  window. — _proved by:_
+  window. — _proved by:_ `tests/pane.test.ts` › "j/k move a selection through the commit list and l opens the selected commit"
 
 ## Context
 
@@ -109,19 +109,22 @@ Git (checked when the phase is built, against a real repo, not only canned outpu
 - [x] Teach `navigate`'s back key the order: diff, then commit, then nothing.
 - [x] Run `bun run format` and `bun run check`.
 
-## Phase 3: Move through the commit list with j/k
+## Phase 3: Move through the commit list with j/k ✅
 
 **Description:** The keys work on the commit list as on the tree.
 
+The list only holds the commits that fit, so the selection moves through those and never needs to scroll; the
+`j`/`k`/`l` hints now show while the list does, which takes the hint rows from the box.
+
 **Test Checklist:**
 
-- [ ] Pane test (B5): `j`/`k` move the selected commit, `l` opens it; the selection stays in the window.
+- [x] Pane test (B5): `j`/`k` move the selected commit, `l` opens it; the selection stays in the window.
 
 **To-do:**
 
-- [ ] Give the list a cursor (reuse `cursor` with commit ids) and route `j`/`k`/`l` to it while the list shows.
-- [ ] Run `bun run format` and `bun run check`.
+- [x] Give the list a cursor (reuse `cursor` with commit ids) and route `j`/`k`/`l` to it while the list shows.
+- [x] Run `bun run format` and `bun run check`.
 
 ## Next step
 
-Phase 3: a cursor on the commit list, with `j`/`k` moving it and `l` opening the selected commit.
+Done: all three phases are in.

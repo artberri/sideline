@@ -109,6 +109,8 @@ let isRefreshQueued = false
 let lastDescription: string | undefined
 // The changes box's last drawn window, which a scroll clamps to: its content's lines and the rows it shows.
 let changesWindow = { lines: 0, rows: 0 }
+// How many recent commits the changes box last drew, which j/k move through.
+let commitsShown = 0
 // Claude Code's row dot on this machine, read at session start.
 let rowDot = rowDotFor('')
 
@@ -272,6 +274,28 @@ async function closeCommit($: EngineInterface): Promise<void> {
 	await update($, viewing, () => null)
 }
 
+// The selection on the recent commits list, by `commit:<sha>` in the shared cursor: j/k move it through the commits
+// drawn, and l opens the selected one.
+async function navigateCommits($: EngineInterface, key: string): Promise<void> {
+	const shown = await read($, snapshot)
+	if (shown.kind !== 'repo') return
+	const listed = shown.commits.slice(0, commitsShown)
+	const ids = listed.map((commit) => `commit:${commit.sha}`)
+	const at = resolveCursor(
+		ids.map((id) => ({ id })),
+		await read($, cursor),
+	)
+	if (OPEN.has(key)) {
+		const commit = listed[at]
+		if (commit) await openCommit($, commit)
+		return
+	}
+	const by = DOWN.has(key) ? 1 : UP.has(key) ? -1 : 0
+	if (by === 0 || ids.length === 0) return
+	const index = at < 0 ? 0 : Math.min(Math.max(at + by, 0), ids.length - 1)
+	await update($, cursor, () => ({ id: ids[index] ?? '', index }))
+}
+
 async function navigate($: EngineInterface, key: string): Promise<void> {
 	const focused = await read($, focusedCommand)
 	// c toggles: into the commands box on the newest command, and from there back to the changes box, as h does.
@@ -303,6 +327,10 @@ async function navigate($: EngineInterface, key: string): Promise<void> {
 		return
 	}
 	const tree = await currentTree($)
+	if (tree && tree.rows.length === 0 && (await read($, viewing)) === null) {
+		await navigateCommits($, key)
+		return
+	}
 	if (!tree || tree.rows.length === 0) return
 	if (open !== null) {
 		await stepDiff($, tree.rows, open, DOWN.has(key) ? 1 : UP.has(key) ? -1 : 0)
@@ -757,7 +785,13 @@ export const register: Register = (on, options) => {
 			isBinary: row.isBinary,
 		}))
 		const commit = await read($, viewing)
-		const hints = (rows.length > 0 || diffView || commandView || logged.length > 0 || commit) && (
+		const isListingCommits = rows.length === 0 && !diffView && !commandView && !commit && shown.commits.length > 0
+		const hints = (rows.length > 0 ||
+			diffView ||
+			commandView ||
+			logged.length > 0 ||
+			commit ||
+			isListingCommits) && (
 			<Box flexDirection="column" alignItems="center" marginTop={1}>
 				<Box flexDirection="row">
 					{commandView ? (
@@ -881,6 +915,11 @@ export const register: Register = (on, options) => {
 		}
 		const windowTree = rows.slice(offset, offset + shownRows)
 		const now = await $.clock.now()
+		// Under the status line, a blank row and the heading.
+		const listedCommits = shown.commits.slice(0, Math.max(0, shownRows - 3))
+		commitsShown = listedCommits.length
+		const selectedId = (await read($, cursor))?.id ?? ''
+		const selectedCommit = selectedId.startsWith('commit:') ? selectedId.slice('commit:'.length) : null
 		return fill(
 			<Box flexDirection="column" flexGrow={1}>
 				{title}
@@ -931,9 +970,16 @@ export const register: Register = (on, options) => {
 									<Box flexDirection="column" marginTop={1}>
 										<Text bold>Recent commits</Text>
 										{shown.commits.length === 0 && <Text dimColor>no commits yet</Text>}
-										{/* Under the status line, a blank row and the heading. */}
-										{shown.commits.slice(0, Math.max(0, shownRows - 3)).map((recent) => (
-											<Box key={`commit-line-${recent.sha}`} justifyContent="space-between">
+										{listedCommits.map((recent) => (
+											<Box
+												key={`commit-line-${recent.sha}`}
+												justifyContent="space-between"
+												backgroundColor={
+													recent.sha === selectedCommit && hoverBackground
+														? hoverBackground
+														: undefined
+												}
+											>
 												<elements.Button
 													key={`commit-${recent.sha}`}
 													plain
@@ -941,7 +987,9 @@ export const register: Register = (on, options) => {
 													onPress={() => void openCommit($, recent)}
 												>
 													<Text dimColor>{`${recent.sha} `}</Text>
-													{recent.subject}
+													<Text inverse={recent.sha === selectedCommit && !hoverBackground}>
+														{recent.subject}
+													</Text>
 												</elements.Button>
 												<Text dimColor>{` ${shortAge(now, recent.time)}`}</Text>
 											</Box>
