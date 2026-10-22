@@ -51,3 +51,18 @@ export function logLine(command: string, columns: number): string {
 	const line = `$ ${lines[0] ?? ''}${lines.length > 1 ? ' …' : ''}`
 	return line.length > columns ? `${line.slice(0, Math.max(columns - 1, 0))}…` : line
 }
+
+export type CommandMove = 'down' | 'up' | 'open' | 'leave'
+
+// What a key does while the focus ring is on the log line `current`: j/k move it to the next or previous command,
+// stopping at the ends; l opens the command; h leaves the box. `ids` are oldest first.
+export function commandStep(
+	ids: readonly string[],
+	current: string,
+	move: CommandMove | null,
+): { kind: 'focus'; id: string } | { kind: 'open' } | { kind: 'leave' } | null {
+	if (move === 'open' || move === 'leave') return { kind: move }
+	if (move === null) return null
+	const target = ids[ids.indexOf(current) + (move === 'down' ? 1 : -1)]
+	return target === undefined ? null : { kind: 'focus', id: target }
+}

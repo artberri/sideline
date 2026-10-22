@@ -11,7 +11,7 @@ import type {
 	Snapshot,
 	TurnState,
 } from '../types'
-import { LOG_SIZE, hiddenCommandInput, logLine, runningDescription } from './commands'
+import { LOG_SIZE, commandStep, hiddenCommandInput, logLine, runningDescription } from './commands'
 import { readDiff, readSnapshot } from './git'
 import { rowIcon } from './icons'
 import { cutDiff, drawDiff, drawRows } from './rows'
@@ -52,6 +52,9 @@ const DOWN = new Set(['j', 'down'])
 const UP = new Set(['k', 'up'])
 const OPEN = new Set(['l', 'right', 'return'])
 const BACK = new Set(['h', 'left', 'backspace'])
+// The key that puts the focus ring on the newest command in the log.
+const COMMANDS_KEY = 'c'
+const COMMAND_KEY_PREFIX = 'command-'
 // The tools whose call waits on the person: a question, a plan to approve.
 const DIALOG_TOOLS = new Set(['AskUserQuestion', 'ExitPlanMode'])
 
@@ -66,6 +69,8 @@ const commands = atom({ plugin: 'sideline', key: 'commands' } as const, [] as Lo
 const openCommand = atom({ plugin: 'sideline', key: 'openCommand' } as const, null as string | null)
 // The first line the changes box shows of its tree, diff or command.
 const changesOffset = atom({ plugin: 'sideline', key: 'changesOffset' } as const, 0)
+// The logged command whose line holds the pane's focus ring, by tool_use_id: while set, j/k move between commands.
+const focusedCommand = atom({ plugin: 'sideline', key: 'focusedCommand' } as const, null as string | null)
 const turn = atom({ plugin: 'sideline', key: 'turn' } as const, 'idle' as TurnState)
 
 const STATUS_COLOR: Record<FileStatus, Color> = {
@@ -181,6 +186,7 @@ async function toggleCommand($: EngineInterface, id: string): Promise<void> {
 }
 
 async function select($: EngineInterface, id: string, index: number): Promise<void> {
+	await update($, focusedCommand, () => null)
 	await update($, cursor, () => ({ id, index }))
 	// The pane never scrolls; the changes box's own window follows the selection.
 	const { lines, rows } = changesWindow
@@ -198,7 +204,42 @@ async function stepDiff($: EngineInterface, rows: TreeRow[], open: string, by: n
 }
 
 // One key, from the rows Client or a legend hotkey: moves the selection, opens its file, or closes the diff.
+// Puts the pane's focus ring on a logged command's line, and j/k on the commands box until h or the person moves the
+// ring elsewhere.
+async function focusCommand($: EngineInterface, id: string): Promise<void> {
+	await update($, focusedCommand, () => id)
+	await $.ui.focus({ requestId: PANE, key: `${COMMAND_KEY_PREFIX}${id}` }).catch(() => undefined)
+}
+
+// In the commands box j/k step through the log, l opens the command, h leaves for the tree.
+async function navigateCommands($: EngineInterface, id: string, key: string): Promise<void> {
+	const ids = (await read($, commands)).map((one) => one.id)
+	const step = commandStep(
+		ids,
+		id,
+		DOWN.has(key) ? 'down' : UP.has(key) ? 'up' : OPEN.has(key) ? 'open' : BACK.has(key) ? 'leave' : null,
+	)
+	if (step?.kind === 'focus') await focusCommand($, step.id)
+	else if (step?.kind === 'open') await toggleCommand($, id)
+	else if (step?.kind === 'leave') {
+		await update($, focusedCommand, () => null)
+		await $.ui.focus({ requestId: PANE, key: 'nav-l' }).catch(() => undefined)
+	}
+}
+
 async function navigate($: EngineInterface, key: string): Promise<void> {
+	const focused = await read($, focusedCommand)
+	// c toggles: into the commands box on the newest command, and from there back to the changes box, as h does.
+	if (key === COMMANDS_KEY) {
+		const newest = (await read($, commands)).at(-1)
+		if (focused !== null) await navigateCommands($, focused, 'h')
+		else if (newest) await focusCommand($, newest.id)
+		return
+	}
+	if (focused !== null && (await read($, openCommand)) === null) {
+		await navigateCommands($, focused, key)
+		return
+	}
 	if ((await read($, openCommand)) !== null) {
 		if (BACK.has(key)) {
 			await update($, openCommand, () => null)
@@ -333,6 +374,16 @@ export const register: Register = (on, options) => {
 		else await finishEdit($, edit.id, startedAt)
 		void refresh($)
 		return result
+	})
+
+	// The person's own Tab or click onto a log line puts j/k on the commands box, and onto anything else but the hint
+	// buttons (which j/k/l press) takes them back to the tree. The mod's own moves set it where they happen.
+	on('ui.focus', { requestId: PANE }, async ($, e, next) => {
+		const element = e.element ?? ''
+		const isCommand = element.startsWith(COMMAND_KEY_PREFIX) && element !== 'command-back'
+		if (e.origin.kind === 'person' && !element.startsWith('nav-'))
+			await update($, focusedCommand, () => (isCommand ? element.slice(COMMAND_KEY_PREFIX.length) : null))
+		return next(e)
 	})
 
 	// The pane always fits its rows, so the engine never scrolls it: a wheel tick over the changes box moves that box's
@@ -513,6 +564,7 @@ export const register: Register = (on, options) => {
 		const changes = (body: JSX.Element, footer = '') =>
 			titled('CHANGES', CHANGES_COLOR, body, 'changes', undefined, footer)
 		const logged = await read($, commands)
+		const isInCommands = (await read($, focusedCommand)) !== null
 		const open = await read($, openCommand)
 		const logColumns = e.props.bodyColumns - BOX_FRAME
 		const log = titled(
@@ -577,7 +629,7 @@ export const register: Register = (on, options) => {
 			deleted: row.deleted,
 			isBinary: row.isBinary,
 		}))
-		const hints = (rows.length > 0 || diffView || commandView) && (
+		const hints = (rows.length > 0 || diffView || commandView || logged.length > 0) && (
 			<Box flexDirection="column" alignItems="center" marginTop={1}>
 				<Box flexDirection="row">
 					{commandView ? (
@@ -649,6 +701,17 @@ export const register: Register = (on, options) => {
 								label="open"
 								onPress={() => navigate($, 'l')}
 							/>
+							{logged.length > 0 && <Text> </Text>}
+							{logged.length > 0 && (
+								<elements.Button
+									key="nav-c"
+									plain
+									dimColor
+									hotkey={COMMANDS_KEY}
+									label={isInCommands ? 'changes' : 'commands'}
+									onPress={() => navigate($, COMMANDS_KEY)}
+								/>
+							)}
 						</Box>
 					)}
 				</Box>

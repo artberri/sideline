@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
+import { commandStep } from '../hooks/commands'
 import {
 	changesRows,
 	clampOffset,
@@ -45,4 +46,14 @@ test('revealOffset moves the window just enough to show the line', () => {
 	expect(revealOffset(0, 3, 5)).toBe(0)
 	expect(revealOffset(0, 5, 5)).toBe(1)
 	expect(revealOffset(4, 2, 5)).toBe(2)
+})
+
+test('commandStep moves j/k through the log, stopping at the ends; l opens and h leaves', () => {
+	const ids = ['one', 'two', 'three']
+	expect(commandStep(ids, 'three', 'up')).toEqual({ kind: 'focus', id: 'two' })
+	expect(commandStep(ids, 'two', 'down')).toEqual({ kind: 'focus', id: 'three' })
+	expect(commandStep(ids, 'three', 'down')).toBeNull()
+	expect(commandStep(ids, 'one', 'up')).toBeNull()
+	expect(commandStep(ids, 'two', 'open')).toEqual({ kind: 'open' })
+	expect(commandStep(ids, 'two', 'leave')).toEqual({ kind: 'leave' })
 })

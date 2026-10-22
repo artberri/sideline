@@ -934,3 +934,29 @@ test('a scroll key (no pointer) scrolls CHANGES', async ($, on) => {
 	await $.ui.scroll(wheel(2))
 	expect(await shortPane($)).toContain(' ↑ 2 ↓ 4 ')
 })
+
+test('the c commands hint shows only once a command is logged', async ($, on) => {
+	const w: World = { status: STATUS }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	expect(await drawn($, 'terminal')).not.toContain('"hotkey":"c"')
+	await $.tool.call({ tool: 'Bash', command: 'echo one' })
+	await clock.settle()
+	expect(await drawn($, 'terminal')).toContain('"hotkey":"c"')
+})
+
+test('the c hint reads commands, and changes once c has moved into the log', async ($, on) => {
+	const w: World = { status: STATUS }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	await $.tool.call({ tool: 'Bash', command: 'echo one' })
+	await clock.settle()
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	const label = async () => (await ui.find({ key: 'nav-c' }))?.props.label
+	expect(await label()).toBe('commands')
+	await ui.press({ key: 'nav-c' })
+	expect(await label()).toBe('changes')
+	await ui.press({ key: 'nav-c' })
+	expect(await label()).toBe('commands')
+	await ui.unmount()
+})

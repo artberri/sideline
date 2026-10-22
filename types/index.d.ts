@@ -60,6 +60,7 @@ declare module 'claude-code' {
 			commands: LoggedCommand[]
 			openCommand: string | null
 			changesOffset: number
+			focusedCommand: string | null
 			turn: TurnState
 		}
 	}
