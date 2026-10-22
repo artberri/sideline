@@ -530,11 +530,12 @@ export const register: Register = (on, options) => {
 	// row turns that off, and the engine still prints the command. Those rows come back once the group folds.
 	on('ui.render', { component: 'ToolGroup' }, async ($, e, next) => {
 		const { calls, isActive, isExpanded, isCallsOnly } = e.props
-		const isFailed = calls.some((call) => call.isErrored || call.isInterrupted)
-		if (!isHidingCommands || isExpanded || isFailed) return next(e)
+		if (!isHidingCommands || isExpanded) return next(e)
 		// A finished group's count line (`Ran 1 shell command`) says nothing the rows around it don't; one that also
-		// loaded a CLAUDE.md or ran a hook keeps it.
-		if (!isActive && isCallsOnly !== true) return next(e)
+		// loaded a CLAUDE.md or ran a hook keeps it. A failed or interrupted call also makes a group not calls-only, and
+		// the commands box already marks it ✗, so a group with one is taken to be calls-only otherwise.
+		const isFailed = calls.some((call) => call.isErrored || call.isInterrupted)
+		if (!isActive && isCallsOnly !== true && !isFailed) return next(e)
 		const { Box, Text } = $.ui.resolve(e)
 		if (!isActive) return <Box />
 		const description = runningDescription(calls, lastDescription)

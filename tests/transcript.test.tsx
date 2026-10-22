@@ -294,22 +294,32 @@ test('a finished group draws nothing', async ($, on) => {
 	expect(text).not.toContain(DESCRIPTION)
 })
 
-test('a finished group that loaded a CLAUDE.md, ran a hook or failed keeps the engine line', async ($, on) => {
+test('a finished group that loaded a CLAUDE.md or ran a hook keeps the engine line', async ($, on) => {
 	groupWorld(on)
 	const done = { ...longCall, isRunning: false }
 	expect(await drawnGroup($, [done], { isActive: false, isCallsOnly: false })).toContain('engine group')
-	expect(await drawnGroup($, [{ ...done, isErrored: true }], { isActive: false })).toContain('engine group')
 	expect(await drawnGroup($, [done], { isActive: false, isExpanded: true })).toContain('engine group')
 })
 
-test('a live group running a Read, or with a failed call, draws the engine line', async ($, on) => {
+test('a finished group with a failed or interrupted call draws nothing either', async ($, on) => {
+	groupWorld(on)
+	const failed = { ...longCall, isRunning: false, isErrored: true }
+	const cut = { ...longCall, isRunning: false, isInterrupted: true }
+	expect(await drawnGroup($, [failed], { isActive: false, isCallsOnly: false })).not.toContain('engine group')
+	expect(await drawnGroup($, [cut], { isActive: false, isCallsOnly: false })).not.toContain('engine group')
+})
+
+test('a live group running a Read draws the engine line', async ($, on) => {
 	groupWorld(on)
 	const read = { ...longCall, tool: 'Read', input: { file_path: '/repo/a.ts' } }
 	expect(await drawnGroup($, [read])).toContain('engine group')
-	expect(await drawnGroup($, [{ ...longCall, isRunning: false, isErrored: true }, longCall])).toContain(
-		'engine group',
-	)
-	expect(await drawnGroup($, [{ ...longCall, isInterrupted: true }])).toContain('engine group')
+})
+
+test('a live group with a failed call still draws the description, not the command', async ($, on) => {
+	groupWorld(on)
+	const text = await drawnGroup($, [{ ...longCall, isRunning: false, isErrored: true }, longCall])
+	expect(text).toContain(DESCRIPTION)
+	expect(text).not.toContain('python3')
 })
 
 test('a live group that loaded a CLAUDE.md or ran a hook still hides the command', async ($, on) => {
