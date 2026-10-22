@@ -176,13 +176,13 @@ alone while running, under a new `transcriptCommands` option.
 - [x] Write the tests above.
 - [x] Run `bun run format` and `bun run check`.
 
-## Phase 4: Show the running command at the bottom of the pane
+## Phase 4: Show the running command at the bottom of the pane ✅
 
 **Description:** A dim `$ <command>` line under the tree while a Bash command runs, gone when it ends.
 
 **Test Checklist:**
 
-- [ ] Manual, live session (B8): the footer sits at the bottom of the pane while a command runs.
+- [x] Manual, live session (B8): the footer sits at the bottom of the pane while a command runs.
 
 - [x] Pane test (B8): while a Bash call runs, the pane draws `$ <command>` under the tree.
 - [x] Pane test (B8): after the call resolves, the line is gone.
@@ -206,4 +206,4 @@ test file order.
 
 ## Next step
 
-Phase 4: live check of the pane footer; then the plan is done.
+Done: all four phases are in.
