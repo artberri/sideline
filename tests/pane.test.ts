@@ -1,5 +1,6 @@
 import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
+import { commandLines } from '../hooks/commands'
 import { cutDiff } from '../hooks/rows'
 import type { Engine } from 'claude-code/testing'
 
@@ -551,3 +552,53 @@ test('in a diff, j/k open the next or previous changed file, and h lands on the 
 	expect(await selectedOf(ui)).toBe('fresh.ts')
 	await ui.unmount()
 })
+
+const SCRIPT = 'sleep 8\ndate > /tmp/now.txt && git branch --show-current'
+
+test('commandLines shows up to three lines, cut to the width, and counts the rest', () => {
+	expect(commandLines('git status', 40)).toEqual(['$ git status'])
+	expect(commandLines('a\n\n  b   c\nd\ne\nf', 40)).toEqual(['$ a', '  b c', '  d', '  … 2 more lines'])
+	expect(commandLines('x'.repeat(50), 10)).toEqual(['$ xxxxxxx…'])
+})
+
+test('a running Bash command shows at the bottom of the pane until it ends', async ($, on) => {
+	const w: World = { status: STATUS }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const finish = held(w)
+	const call = $.tool.call({ tool: 'Bash', command: SCRIPT, description: 'Wait, then save the date' })
+	await clock.settle()
+	const during = await drawn($, 'terminal')
+	expect(during).toContain('$ sleep 8')
+	expect(during).toContain('  date > /tmp/now.txt')
+	finish({ result: { stdout: '', stderr: '', interrupted: false } })
+	await call
+	await clock.settle()
+	expect(await drawn($, 'terminal')).not.toContain('sleep 8')
+})
+
+test('a long command line is cut to the pane width', async ($, on) => {
+	const w: World = { status: STATUS }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	held(w)
+	void $.tool.call({ tool: 'Bash', command: `echo ${'y'.repeat(100)}` })
+	await clock.settle()
+	const text = await drawn($, 'terminal')
+	expect(text).toContain(`$ echo ${'y'.repeat(30)}…`)
+	expect(text).not.toContain('y'.repeat(32))
+})
+
+test(
+	'transcriptCommands: show keeps the command out of the pane',
+	{ options: { transcriptCommands: 'show' } },
+	async ($, on) => {
+		const w: World = { status: STATUS }
+		const clock = world(on, w, [])
+		await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+		held(w)
+		void $.tool.call({ tool: 'Bash', command: SCRIPT })
+		await clock.settle()
+		expect(await drawn($, 'terminal')).not.toContain('sleep 8')
+	},
+)

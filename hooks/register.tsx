@@ -1,8 +1,8 @@
 import { atom, read, update } from 'claude-code'
 import type { Color, EngineInterface, Register } from 'claude-code'
 
-import type { ActiveEdit, ChangedFile, Cursor, FileDiff, FileStatus, Snapshot } from '../types'
-import { hiddenCommandInput, runningDescription } from './commands'
+import type { ActiveEdit, ChangedFile, Cursor, FileDiff, FileStatus, RunningCommand, Snapshot } from '../types'
+import { commandLines, hiddenCommandInput, runningDescription } from './commands'
 import { readDiff, readSnapshot } from './git'
 import { rowIcon } from './icons'
 import { cutDiff, drawDiff, drawRows } from './rows'
@@ -33,6 +33,7 @@ const edits = atom({ plugin: 'vacuo', key: 'edits' } as const, [] as ActiveEdit[
 const selected = atom({ plugin: 'vacuo', key: 'selected' } as const, null as string | null)
 const diff = atom({ plugin: 'vacuo', key: 'diff' } as const, null as FileDiff | null)
 const cursor = atom({ plugin: 'vacuo', key: 'cursor' } as const, null as Cursor | null)
+const running = atom({ plugin: 'vacuo', key: 'running' } as const, [] as RunningCommand[])
 
 const STATUS_COLOR: Record<FileStatus, Color> = {
 	added: 'success',
@@ -213,7 +214,13 @@ export const register: Register = (on, options) => {
 	on('tool.call', async ($, e, next) => {
 		const path = editedPath(e)
 		if (!path) {
-			const result = await next(e)
+			const command = isHidingCommands && e.tool === 'Bash' ? e.command : undefined
+			if (command !== undefined) await update($, running, (list) => [...list, { id: e.tool_use_id, command }])
+			const result = await next(e).finally(() =>
+				command === undefined
+					? undefined
+					: update($, running, (list) => list.filter((one) => one.id !== e.tool_use_id)),
+			)
 			if (e.tool === 'Bash' && !result.deny && !result.isError) {
 				const startedAt = await $.clock.now()
 				for (const file of bashChangedFiles(result.result)) {
@@ -323,6 +330,8 @@ export const register: Register = (on, options) => {
 		const opened = openPath !== null && openDiff?.path === openPath ? openDiff : null
 		const diffView = opened ? { path: opened.path, ...cutDiff(opened.hunks) } : null
 		const at = resolveCursor(treeRowsShown, await read($, cursor))
+		const commands = await read($, running)
+		const runningCommand = commands.at(-1)
 		const cursorId = treeRowsShown[at]?.id ?? null
 		const rows = treeRowsShown.map((row): RowSpec => ({
 			id: row.id,
@@ -426,6 +435,20 @@ export const register: Register = (on, options) => {
 						<Text dimColor wrap="wrap">
 							{FOCUS_HINT}
 						</Text>
+					</Box>
+				)}
+				{runningCommand && (
+					<Box
+						flexGrow={rows.length > 0 || diffView ? 0 : 1}
+						flexDirection="column"
+						justifyContent="flex-end"
+						marginTop={1}
+					>
+						{commandLines(runningCommand.command, e.props.bodyColumns - 2).map((line, index) => (
+							<Text key={`command-${index}`} dimColor>
+								{line}
+							</Text>
+						))}
 					</Box>
 				)}
 			</Box>,

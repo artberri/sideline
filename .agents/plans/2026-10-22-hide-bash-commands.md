@@ -22,7 +22,7 @@ the bottom of vacuo's pane, while it runs.
   commands` as before. — _proved by:_ `tests/transcript.test.tsx` › a live group running a long described command draws the description, not the command; a live group hides a short described command too; a finished group draws the engine line
 - **B7.** A live group whose running call is not Bash (a Read, a Grep) is drawn as Claude Code draws it. — _proved by:_ `tests/transcript.test.tsx` › a live group running a Read, or not calls-only, draws the engine line
 - **B8.** While a Bash command runs, the bottom of the pane shows it dimmed as `$ <command>`, cut to the pane's width;
-  the line is gone once no Bash command is running. — _proved by:_
+  the line is gone once no Bash command is running. — _proved by:_ `tests/pane.test.ts` › a running Bash command shows at the bottom of the pane until it ends; a long command line is cut to the pane width; commandLines shows up to three lines, cut to the width, and counts the rest
 - **B9.** The ctrl+o view shows every command and answer in full. — _proved by:_ `tests/transcript.test.tsx` › ctrl+o shows the command (Bash rows)
 - **B10.** With the `transcriptCommands` option set to `show`, the transcript shows commands and answers as Claude
   Code draws them, and the pane has no command line. — _proved by:_ `tests/transcript.test.tsx` › transcriptCommands: show keeps the command (Bash rows)
@@ -43,6 +43,8 @@ the bottom of vacuo's pane, while it runs.
   the transcript repeating input the person just saw or typed.
 - **The answers row keeps its header** (`User answered Claude's questions:`) and drops the question → answer lines;
   the person just picked them.
+- **The footer shows up to three of the command's lines** (`$ ` before the first, `… N more lines` after), each cut to
+  the pane's width: the first line alone is often just `sleep 8` or `cd …`.
 - **The pane footer shows the command only while it runs.** No history: once it ends the footer goes, so the pane
   doesn't grow a stale line.
 - **ctrl+o keeps everything:** every hook passes through when `isExpanded` is true, as the `ToolResult` hook for
@@ -174,20 +176,22 @@ alone while running, under a new `transcriptCommands` option.
 
 **Test Checklist:**
 
-- [ ] Pane test (B8): while a Bash call runs, the pane draws `$ <command>` under the tree.
-- [ ] Pane test (B8): after the call resolves, the line is gone.
-- [ ] Pane test (B8): a multi-line or long command draws on one line, cut to the pane's width.
-- [ ] Pane test (B10): with `show`, no command line.
+- [ ] Manual, live session (B8): the footer sits at the bottom of the pane while a command runs.
+
+- [x] Pane test (B8): while a Bash call runs, the pane draws `$ <command>` under the tree.
+- [x] Pane test (B8): after the call resolves, the line is gone.
+- [x] Pane test (B8): a multi-line or long command draws on one line, cut to the pane's width.
+- [x] Pane test (B10): with `show`, no command line.
 
 **To-do:**
 
-- [ ] Add `RunningCommand` and `running` to `types/index.d.ts`, and its atom in `register.tsx`.
-- [ ] In the `tool.call` hook, add a Bash call to `running` before `next(e)` and remove it once `next` resolves (or
+- [x] Add `RunningCommand` and `running` to `types/index.d.ts`, and its atom in `register.tsx`.
+- [x] In the `tool.call` hook, add a Bash call to `running` before `next(e)` and remove it once `next` resolves (or
       throws).
-- [ ] Add `commandLine(command, columns)` to `hooks/commands.ts`: first line, whitespace squeezed, cut with `…`.
-- [ ] Draw the footer in the `Pane` hook, below the tree and diff views, when `running` holds a call.
-- [ ] Write the tests above in `tests/pane.test.ts`.
-- [ ] Run `bun run format` and `bun run check`.
+- [x] Add `commandLines(command, columns)` to `hooks/commands.ts`: up to three lines, whitespace squeezed, cut with `…`.
+- [x] Draw the footer in the `Pane` hook, below the tree and diff views, when `running` holds a call.
+- [x] Write the tests above in `tests/pane.test.ts`.
+- [x] Run `bun run format` and `bun run check`.
 
 ## Follow-ups
 
@@ -197,4 +201,4 @@ alone while running, under a new `transcriptCommands` option.
 
 ## Next step
 
-Phase 2: find which component draws the answers to Claude's questions.
+Phase 4: live check that the footer sits at the bottom of the pane while a command runs; then Phase 2.
