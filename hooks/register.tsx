@@ -2,6 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { Color, EngineInterface, Register } from 'claude-code'
 
 import type { ActiveEdit, ChangedFile, Cursor, FileDiff, FileStatus, Snapshot } from '../types'
+import { runningDescription } from './commands'
 import { readDiff, readSnapshot } from './git'
 import { rowIcon } from './icons'
 import { cutDiff, drawDiff, drawRows } from './rows'
@@ -191,6 +192,7 @@ export const register: Register = (on, options) => {
 	const background = backgroundOption(options.background)
 	const hoverBackground = background ? lighten(background) : null
 	const isHidingDiffs = options.transcriptDiffs !== 'show'
+	const isHidingCommands = options.transcriptCommands !== 'show'
 
 	on('session.start', async ($, e, next) => {
 		await $.command.register({ name: 'vacuo', description: 'Show the changed-files pane' })
@@ -243,6 +245,25 @@ export const register: Register = (on, options) => {
 			if ('kind' in data && data.kind === 'file') await openFile($, data.press)
 		}
 		return {}
+	})
+
+	// The live line of a folded group draws its running command under the description, and that text is no prop a
+	// rewrite reaches, so the line is drawn here.
+	on('ui.render', { component: 'ToolGroup' }, async ($, e, next) => {
+		const { calls, isActive, isExpanded, isCallsOnly } = e.props
+		if (!isHidingCommands || !isActive || isExpanded || isCallsOnly !== true) return next(e)
+		const description = runningDescription(calls)
+		if (!description) return next(e)
+		const { Box, Text } = $.ui.resolve(e)
+		// Engine rows keep a blank line above them; a row drawn in their place doesn't get it.
+		return (
+			<Box marginTop={1}>
+				<Text>
+					<Text dimColor>● </Text>
+					{description}
+				</Text>
+			</Box>
+		)
 	})
 
 	on('ui.render', { component: 'ToolResult' }, async ($, e, next) => {

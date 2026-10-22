@@ -1,7 +1,8 @@
-import type { On } from 'claude-code'
+import type { On, ToolGroupCall } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
+import { isLongCommand, runningDescription } from '../hooks/commands'
 import { countPatch, summarize } from '../hooks/summary'
 
 const CWD = '/repo'
@@ -133,3 +134,99 @@ test('transcriptDiffs: show keeps the engine diff', { options: { transcriptDiffs
 	world(on)
 	expect(await drawnResult($, 'Edit', EDIT_OUTPUT)).toContain('engine diff')
 })
+
+const LONG = "cd ~/Pets/vacuo2 && python3 - <<'EOF'\np='hooks/symbols.ts'; s=open(p).read()\nEOF"
+const DESCRIPTION = 'Adding hover underline to file rows'
+
+test('isLongCommand is true for a newline or past 80 characters', () => {
+	expect(isLongCommand('git status')).toBe(false)
+	expect(isLongCommand('x'.repeat(80))).toBe(false)
+	expect(isLongCommand('x'.repeat(81))).toBe(true)
+	expect(isLongCommand('a\nb')).toBe(true)
+})
+
+const described = { command: LONG, description: DESCRIPTION }
+
+const longCall = { tool: 'Bash', input: described, isRunning: true, isErrored: false, isInterrupted: false }
+
+function groupWorld(on: On) {
+	on('ui.render', { component: 'ToolGroup' }, ($, e) => {
+		const { Text } = $.ui.resolve(e)
+		return <Text>{`engine group ${JSON.stringify(e.props.calls.map((call) => call.input))}`}</Text>
+	})
+}
+
+type GroupState = { isActive?: boolean; isExpanded?: boolean; isCallsOnly?: boolean }
+
+async function drawnGroup($: Engine, calls: ToolGroupCall[], state: GroupState = {}) {
+	const ui = await $.ui.mount({
+		plugin: 'vacuo',
+		surface: 'terminal',
+		component: 'ToolGroup',
+		props: {
+			calls,
+			isActive: state.isActive ?? true,
+			isExpanded: state.isExpanded ?? false,
+			isCallsOnly: state.isCallsOnly ?? true,
+		},
+	})
+	const text = JSON.stringify(await ui.drawn())
+	await ui.unmount()
+	return text
+}
+
+test('runningDescription reads the running call, else the last one', () => {
+	const done = { ...longCall, isRunning: false }
+	const read = { ...longCall, tool: 'Read', input: { file_path: '/repo/a.ts' } }
+	expect(runningDescription([longCall])).toBe(DESCRIPTION)
+	expect(runningDescription([done])).toBe(DESCRIPTION)
+	expect(runningDescription([longCall, { ...read, isRunning: false }])).toBe(DESCRIPTION)
+	expect(runningDescription([done, read])).toBeUndefined()
+	expect(runningDescription([])).toBeUndefined()
+	expect(runningDescription([{ ...longCall, tool: 'Read' }])).toBeUndefined()
+	expect(runningDescription([{ ...longCall, input: { command: 'ls', description: 'List' } }])).toBeUndefined()
+})
+
+test('a live group running a long described command draws the description, not the command', async ($, on) => {
+	groupWorld(on)
+	const text = await drawnGroup($, [longCall])
+	expect(text).toContain(DESCRIPTION)
+	expect(text).not.toContain('python3')
+})
+
+test('a live group draws the description before its call runs and after it ends', async ($, on) => {
+	groupWorld(on)
+	expect(await drawnGroup($, [{ ...longCall, isRunning: false }])).toContain(DESCRIPTION)
+})
+
+test('a finished group draws the engine line', async ($, on) => {
+	groupWorld(on)
+	expect(await drawnGroup($, [{ ...longCall, isRunning: false }], { isActive: false })).toContain('engine group')
+})
+
+test('a live group running a Read, or not calls-only, draws the engine line', async ($, on) => {
+	groupWorld(on)
+	const read = { ...longCall, tool: 'Read', input: { file_path: '/repo/a.ts' } }
+	expect(await drawnGroup($, [read])).toContain('engine group')
+	expect(await drawnGroup($, [longCall], { isCallsOnly: false })).toContain('engine group')
+})
+
+test('a live group running a short command draws the engine line', async ($, on) => {
+	groupWorld(on)
+	const short = { ...longCall, input: { command: 'git status', description: 'Show status' } }
+	expect(await drawnGroup($, [short])).toContain('engine group')
+})
+
+test('ctrl+o draws the engine group line', async ($, on) => {
+	groupWorld(on)
+	expect(await drawnGroup($, [longCall], { isExpanded: true })).toContain('engine group')
+})
+
+test(
+	'transcriptCommands: show draws the engine group line',
+	{ options: { transcriptCommands: 'show' } },
+	async ($, on) => {
+		groupWorld(on)
+		expect(await drawnGroup($, [longCall])).toContain('engine group')
+	},
+)
