@@ -161,8 +161,16 @@ async function currentTree($: EngineInterface): Promise<{ rows: TreeRow[]; edite
 }
 
 async function openFile($: EngineInterface, path: string): Promise<void> {
+	await update($, openCommand, () => null)
 	await update($, selected, () => path)
 	await refresh($)
+}
+
+// Opens a logged command in the changes box in place of the tree or a diff, or closes it when it is the one open.
+async function toggleCommand($: EngineInterface, id: string): Promise<void> {
+	const isOpen = (await read($, openCommand)) === id
+	if (!isOpen) await closeDiff($)
+	await update($, openCommand, () => (isOpen ? null : id))
 }
 
 async function select($: EngineInterface, id: string, index: number): Promise<void> {
@@ -182,6 +190,10 @@ async function stepDiff($: EngineInterface, rows: TreeRow[], open: string, by: n
 
 // One key, from the rows Client or a legend hotkey: moves the selection, opens its file, or closes the diff.
 async function navigate($: EngineInterface, key: string): Promise<void> {
+	if ((await read($, openCommand)) !== null) {
+		if (BACK.has(key)) await update($, openCommand, () => null)
+		return
+	}
 	const open = await read($, selected)
 	if (open !== null && BACK.has(key)) {
 		await closeDiff($)
@@ -426,9 +438,7 @@ export const register: Register = (on, options) => {
 				flexDirection="column"
 				backgroundColor={background}
 				width={e.props.bodyColumns}
-				minHeight={e.props.scroll.bodyRows}
-				paddingX={1}
-				paddingY={1}
+				height={e.props.scroll.bodyRows}
 			>
 				{body}
 			</Box>
@@ -451,9 +461,19 @@ export const register: Register = (on, options) => {
 		)
 		// A rounded box with its caps title laid over the top border, at the left: the title is a sibling drawn after the
 		// box, so it paints over the border rather than inside the box's clip.
-		const titled = (name: string, color: Color, body: JSX.Element, key: string) => (
-			<Box key={key} flexDirection="column" marginTop={1}>
-				<Box key={`${key}-box`} flexDirection="column" borderStyle="round" borderColor={color} paddingX={1}>
+		// `rows` fixes the box's content rows; without it the box takes every row left.
+		const titled = (name: string, color: Color, body: JSX.Element, key: string, rows?: number) => (
+			<Box key={key} flexDirection="column" flexGrow={rows === undefined ? 1 : 0} flexShrink={0}>
+				<Box
+					key={`${key}-box`}
+					flexDirection="column"
+					borderStyle="round"
+					borderColor={color}
+					paddingX={1}
+					overflow="hidden"
+					flexGrow={rows === undefined ? 1 : 0}
+					height={rows === undefined ? undefined : rows + 2}
+				>
 					{body}
 				</Box>
 				<Box position="absolute" top={0} left={2}>
@@ -464,51 +484,33 @@ export const register: Register = (on, options) => {
 		const changes = (body: JSX.Element) => titled('CHANGES', CHANGES_COLOR, body, 'changes')
 		const logged = await read($, commands)
 		const open = await read($, openCommand)
-		const logColumns = e.props.bodyColumns - 2 - BOX_FRAME
+		const logColumns = e.props.bodyColumns - BOX_FRAME
 		const log = titled(
 			'COMMANDS',
 			COMMAND_COLOR,
 			<Box flexDirection="column">
-				{logged.length === 0 ? (
-					<Text dimColor>no commands yet</Text>
-				) : (
-					logged.map((entry) => (
-						<Box key={`log-${entry.id}`} flexDirection="column">
-							<Box flexDirection="row">
-								<Text color={LOG_GLYPH_COLOR[entry.state]}>{`${LOG_GLYPH[entry.state]} `}</Text>
-								<elements.Button
-									key={`command-${entry.id}`}
-									plain
-									dimColor={entry.state !== 'running' || undefined}
-									label={logLine(entry.command, logColumns - 2)}
-									onPress={() =>
-										void update($, openCommand, (current) =>
-											current === entry.id ? null : entry.id,
-										)
-									}
-								/>
-							</Box>
-							{open === entry.id && (
-								<Box flexDirection="column" paddingLeft={2}>
-									{entry.command.split('\n').map((line, index) => (
-										<Text key={`command-${entry.id}-${index}`} dimColor wrap="wrap">
-											{line === '' ? ' ' : line}
-										</Text>
-									))}
-								</Box>
-							)}
-						</Box>
-					))
-				)}
+				{logged.length === 0 && <Text dimColor>no commands yet</Text>}
+				{logged.map((entry) => (
+					<Box key={`log-${entry.id}`} flexDirection="row">
+						<Text color={LOG_GLYPH_COLOR[entry.state]}>{`${LOG_GLYPH[entry.state]} `}</Text>
+						<elements.Button
+							key={`command-${entry.id}`}
+							plain
+							dimColor={entry.state !== 'running' || undefined}
+							label={logLine(entry.command, logColumns - 2)}
+							onPress={() => void toggleCommand($, entry.id)}
+						/>
+					</Box>
+				))}
 			</Box>,
 			'commands',
+			LOG_SIZE,
 		)
 		if (shown.kind === 'loading')
 			return fill(
 				<Box flexDirection="column" flexGrow={1}>
 					{title}
 					{changes(<Text> </Text>)}
-					<Box flexGrow={1} />
 					{log}
 				</Box>,
 			)
@@ -517,7 +519,6 @@ export const register: Register = (on, options) => {
 				<Box flexDirection="column" flexGrow={1}>
 					{title}
 					{changes(<Text dimColor>not a git repo</Text>)}
-					<Box flexGrow={1} />
 					{log}
 				</Box>,
 			)
@@ -530,6 +531,7 @@ export const register: Register = (on, options) => {
 		const opened = openPath !== null && openDiff?.path === openPath ? openDiff : null
 		const diffView = opened ? { path: opened.path, ...cutDiff(opened.hunks) } : null
 		const at = resolveCursor(treeRowsShown, await read($, cursor))
+		const commandView = logged.find((entry) => entry.id === open) ?? null
 		const cursorId = treeRowsShown[at]?.id ?? null
 		const fileCount = treeRowsShown.filter((row) => row.kind === 'file').length
 		const rows = treeRowsShown.map((row): RowSpec => ({
@@ -545,10 +547,20 @@ export const register: Register = (on, options) => {
 			deleted: row.deleted,
 			isBinary: row.isBinary,
 		}))
-		const hints = (rows.length > 0 || diffView) && (
+		const hints = (rows.length > 0 || diffView || commandView) && (
 			<Box flexDirection="column" alignItems="center" marginTop={1}>
 				<Box flexDirection="row">
-					{diffView ? (
+					{commandView ? (
+						<elements.Button
+							key="nav-h"
+							plain
+							dimColor
+							autoFocus
+							hotkey="h"
+							label="back"
+							onPress={() => navigate($, 'h')}
+						/>
+					) : diffView ? (
 						<Box flexDirection="row">
 							<elements.Button
 								key="nav-h"
@@ -629,7 +641,23 @@ export const register: Register = (on, options) => {
 							{fileCount > 0 && <Text dimColor>{` ${fileCount} file${fileCount === 1 ? '' : 's'}`}</Text>}
 						</Box>
 						<Box flexDirection="column" marginTop={1}>
-							{rows.length === 0 && !diffView ? (
+							{commandView ? (
+								<Box flexDirection="column">
+									<elements.Button
+										key="command-back"
+										plain
+										label="← back"
+										onPress={() => void toggleCommand($, commandView.id)}
+									/>
+									<Box flexDirection="column" marginTop={1}>
+										{commandView.command.split('\n').map((line, index) => (
+											<Text key={`command-line-${index}`} wrap="wrap">
+												{index === 0 ? `$ ${line}` : line === '' ? ' ' : line}
+											</Text>
+										))}
+									</Box>
+								</Box>
+							) : rows.length === 0 && !diffView ? (
 								<Text dimColor>no changes</Text>
 							) : 'Client' in elements ? (
 								<elements.Client
@@ -645,7 +673,6 @@ export const register: Register = (on, options) => {
 						</Box>
 					</Box>,
 				)}
-				<Box flexGrow={1} />
 				{log}
 			</Box>,
 		)

@@ -629,9 +629,9 @@ test('a long command line is cut to the width inside its box', async ($, on) => 
 	void $.tool.call({ tool: 'Bash', command: `echo ${'y'.repeat(100)}` })
 	await clock.settle()
 	const text = await logged($)
-	// 40 columns, less the pane's padding (2), the box's border and padding (4) and the state glyph (2).
-	expect(text).toContain(`$ echo ${'y'.repeat(24)}…`)
-	expect(text).not.toContain('y'.repeat(25))
+	// 40 columns, less the box's border and padding (4) and the state glyph (2).
+	expect(text).toContain(`$ echo ${'y'.repeat(26)}…`)
+	expect(text).not.toContain('y'.repeat(27))
 })
 
 test('transcriptCommands: show still logs the command', { options: { transcriptCommands: 'show' } }, async ($, on) => {
@@ -773,22 +773,62 @@ test("a subagent's question leaves the title WORKING", async ($, on) => {
 	await call
 })
 
-test('pressing a log line unfolds the whole command, and pressing it again folds it', async ($, on) => {
+test('pressing a log line opens the whole command in CHANGES; pressing it again, or h, goes back', async ($, on) => {
 	const w: World = { status: STATUS }
 	const clock = world(on, w, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	await $.tool.call({ tool: 'Bash', command: SCRIPT, tool_use_id: 'toolu_script' })
 	await clock.settle()
 	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-	const shown = async () => JSON.stringify(await ui.find({ key: 'commands' }))
-	expect(await shown()).not.toContain('date > /tmp/now.txt')
+	const changes = async () => JSON.stringify(await ui.find({ key: 'changes' }))
+	expect(await changes()).not.toContain('date > /tmp/now.txt')
 	await ui.press({ key: 'command-toolu_script' })
 	await clock.settle()
-	expect(await shown()).toContain('date > /tmp/now.txt && git branch --show-current')
+	const open = await changes()
+	expect(open).toContain('date > /tmp/now.txt && git branch --show-current')
+	expect(open).toContain('← back')
+	expect(open).not.toContain('"module"')
+	expect(JSON.stringify(await ui.find({ key: 'commands' }))).not.toContain('date > /tmp/now.txt')
 	await ui.press({ key: 'command-toolu_script' })
 	await clock.settle()
-	expect(await shown()).not.toContain('date > /tmp/now.txt')
+	expect(await changes()).not.toContain('date > /tmp/now.txt')
+	await ui.press({ key: 'command-toolu_script' })
+	await clock.settle()
+	await ui.press({ key: 'nav-h' })
+	await clock.settle()
+	expect(await changes()).not.toContain('date > /tmp/now.txt')
 	await ui.unmount()
+})
+
+test('the pane has no outer padding and fills its rows exactly', async ($, on) => {
+	world(on, { status: STATUS }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	const outer = (await ui.drawn()) as { props: Record<string, unknown> }
+	await ui.unmount()
+	expect(outer.props.paddingX).toBeUndefined()
+	expect(outer.props.paddingY).toBeUndefined()
+	expect(outer.props.height).toBe(20)
+})
+
+test('COMMANDS is always five lines tall and CHANGES takes the rest', async ($, on) => {
+	const w: World = { status: STATUS }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const boxes = async () => {
+		const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+		const found = [await ui.find({ key: 'commands-box' }), await ui.find({ key: 'changes-box' })]
+		await ui.unmount()
+		return found.map((box) => box?.props)
+	}
+	for (const count of [0, 2, 6]) {
+		for (let n = 0; n < count; n++) await $.tool.call({ tool: 'Bash', command: `echo ${n}` })
+		await clock.settle()
+		const [commands, changes] = await boxes()
+		expect(commands?.height).toBe(7)
+		expect(changes?.flexGrow).toBe(1)
+		expect(changes?.overflow).toBe('hidden')
+	}
 })
 
 test('an errored command reads ✗', async ($, on) => {
