@@ -1300,3 +1300,32 @@ test('commandRows: 0 draws no COMMANDS box and no c hint', { options: { commandR
 	expect(await ui.find({ key: 'nav-c' })).toBeUndefined()
 	await ui.unmount()
 })
+
+test('outside a repo CHANGES is one line and COMMANDS takes the rest, with more than five commands', async ($, on) => {
+	const clock = world(on, {}, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	for (const n of [1, 2, 3, 4, 5, 6, 7, 8]) await $.tool.call({ tool: 'Bash', command: `echo step${n}` })
+	await clock.settle()
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	const changes = await ui.find({ key: 'changes-box' })
+	const commands = await ui.find({ key: 'commands-box' })
+	const text = JSON.stringify(await ui.find({ key: 'commands' }))
+	expect(JSON.stringify(await ui.find({ key: 'changes' }))).toContain('Not a git repository')
+	await ui.unmount()
+	expect(changes?.props.height).toBe(3)
+	// 60 rows, less the title (1), SESSION (4), CHANGES (3) and the commands box's border (2): 50 lines.
+	expect(commands?.props.height).toBe(52)
+	expect(text).toContain('step1')
+	expect(text).toContain('step8')
+})
+
+test('outside a repo with commandRows: 0, CHANGES keeps the space', { options: { commandRows: 0 } }, async ($, on) => {
+	world(on, {}, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	const changes = await ui.find({ key: 'changes-box' })
+	expect(await ui.find({ key: 'commands' })).toBeUndefined()
+	await ui.unmount()
+	expect(changes?.props.flexGrow).toBe(1)
+	expect(changes?.props.height).toBeUndefined()
+})

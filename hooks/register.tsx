@@ -33,10 +33,11 @@ import {
 } from './symbols'
 import { resolveCursor, treeRows } from './tree'
 import {
+	SESSION_ROWS,
 	changesRows,
+	clampOffset,
 	commandRowsOption,
 	commandsBoxRows,
-	clampOffset,
 	hiddenAround,
 	hiddenLabel,
 	isOverCommands,
@@ -737,15 +738,14 @@ export const register: Register = (on, options) => {
 		const isInCommands = (await read($, focusedCommand)) !== null
 		const open = await read($, openCommand)
 		const logColumns = e.props.bodyColumns - BOX_FRAME
-		// No box at all with `commandRows` at 0.
-		const log =
-			commandLines > 0 &&
+		// The commands box `rows` lines tall, with the newest commands that fit.
+		const logBox = (rows: number) =>
 			titled(
 				elements,
-				{ name: 'COMMANDS', color: COMMAND_COLOR, key: 'commands', rows: commandLines, background },
+				{ name: 'COMMANDS', color: COMMAND_COLOR, key: 'commands', rows, background },
 				<Box flexDirection="column">
 					{logged.length === 0 && <Text dimColor>no commands yet</Text>}
-					{logged.slice(-commandLines).map((entry) => (
+					{logged.slice(-rows).map((entry) => (
 						<Box key={`log-${entry.id}`} flexDirection="row">
 							<Text color={LOG_GLYPH_COLOR[entry.state]}>{`${LOG_GLYPH[entry.state]} `}</Text>
 							<elements.Button
@@ -759,6 +759,8 @@ export const register: Register = (on, options) => {
 					))}
 				</Box>,
 			)
+		// No box at all with `commandRows` at 0.
+		const log = commandLines > 0 && logBox(commandLines)
 		if (shown.kind === 'loading')
 			return fill(
 				<Box flexDirection="column" flexGrow={1}>
@@ -768,15 +770,28 @@ export const register: Register = (on, options) => {
 					{log}
 				</Box>,
 			)
-		if (shown.kind === 'none')
+		// Outside a repo `CHANGES` has one line to say so, and the commands box takes every row left; with no commands box,
+		// `CHANGES` keeps them.
+		if (shown.kind === 'none') {
+			const notRepo = <Text dimColor>Not a git repository</Text>
+			// The title, the session box, `CHANGES` (one line and its border) and the commands box's own border.
+			const taken = 1 + (isShowingSession ? SESSION_ROWS : 0) + 3 + 2
+			const rowsLeft = Math.max(1, e.props.scroll.bodyRows - taken)
 			return fill(
 				<Box flexDirection="column" flexGrow={1}>
 					{title}
 					{sessionBox(<Text dimColor>not a git repo</Text>)}
-					{changes(isShowingSession ? <Text> </Text> : <Text dimColor>not a git repo</Text>)}
-					{log}
+					{commandLines > 0
+						? titled(
+								elements,
+								{ name: 'CHANGES', color: CHANGES_COLOR, key: 'changes', rows: 1, background },
+								notRepo,
+							)
+						: changes(notRepo)}
+					{commandLines > 0 && logBox(rowsLeft)}
 				</Box>,
 			)
+		}
 		const symbols = statusSymbols(shown.status)
 		const tree = await currentTree($)
 		const edited = tree?.edited ?? new Map<string, ActiveEdit>()

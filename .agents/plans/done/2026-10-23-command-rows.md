@@ -13,7 +13,7 @@ Let the person choose how many lines the `COMMANDS` box shows (5 by default, 0 f
   `c commands` hint isn't drawn. — _proved by:_ `tests/pane.test.ts` › "commandRows: 0 draws no COMMANDS box and no c hint"
 - **B3.** A value that isn't a whole number from 0 to 20 counts as 5. — _proved by:_ `tests/window.test.ts` › "commandRowsOption takes a whole number from 0 to 20, else 5"
 - **B4.** Outside a git repo `CHANGES` is one line, "Not a git repository", and `COMMANDS` takes every row left,
-  showing as many of the latest commands as fit; with `commandRows` at `0`, `CHANGES` keeps the space. — _proved by:_
+  showing as many of the latest commands as fit; with `commandRows` at `0`, `CHANGES` keeps the space. — _proved by:_ `tests/pane.test.ts` › "outside a repo CHANGES is one line and COMMANDS takes the rest, with more than five commands", "outside a repo with commandRows: 0, CHANGES keeps the space"
 - **B5.** The wheel over `COMMANDS` still moves nothing, at any height of the box. — _proved by:_ `tests/window.test.ts` › "isOverCommands is true on the commands box rows, false above, for a key, and with no box"
 
 ## Context
@@ -69,25 +69,25 @@ and `COMMANDS_ROWS = LOG_SIZE + 2` in [hooks/window.ts](../../hooks/window.ts) f
       more than 5).
 - [x] Run `bun run format` and `bun run check`.
 
-## Phase 2: Give the commands box the room outside a git repo
+## Phase 2: Give the commands box the room outside a git repo ✅
 
 **Description:** Outside a repo, `CHANGES` is one line saying "Not a git repository" and `COMMANDS` grows to fill the
 pane.
 
 **Test Checklist:**
 
-- [ ] Pane test (B4): outside a repo `CHANGES` reads "Not a git repository" and has a one-line body; `COMMANDS` takes
+- [x] Pane test (B4): outside a repo `CHANGES` reads "Not a git repository" and has a one-line body; `COMMANDS` takes
       the rest, showing more than 5 commands when they were logged.
-- [ ] Pane test (B4): outside a repo with `commandRows: 0`, `CHANGES` keeps the space.
-- [ ] Manual, live session (B4): a folder that isn't a repo.
+- [x] Pane test (B4): outside a repo with `commandRows: 0`, `CHANGES` keeps the space.
+- [x] Manual, live session (B4): a folder that isn't a repo.
 
 **To-do:**
 
 - [x] Keep up to 20 commands in the log (done in Phase 1).
-- [ ] For the `none` snapshot: a one-line `CHANGES` ("Not a git repository") and a `COMMANDS` box with every row
+- [x] For the `none` snapshot: a one-line `CHANGES` ("Not a git repository") and a `COMMANDS` box with every row
       left, unless `commandRows` is `0`.
-- [ ] Run `bun run format` and `bun run check`.
+- [x] Run `bun run format` and `bun run check`.
 
 ## Next step
 
-Phase 2: outside a repo, a one-line `CHANGES` reading "Not a git repository" and `COMMANDS` taking every row left.
+Done: both phases are in.
