@@ -1,8 +1,10 @@
 {
 	"$schema": "./node_modules/oxfmt/configuration_schema.json",
 	"useTabs": true,
+	"tabWidth": 4,
 	"printWidth": 120,
 	"singleQuote": true,
 	"semi": false,
-	"ignorePatterns": [".claude-plugin/types/"]
+	"ignorePatterns": [".claude-plugin/types/"],
+	"overrides": [{ "files": ["*.yml", "*.yaml"], "options": { "tabWidth": 2 } }]
 }
