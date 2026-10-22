@@ -3,7 +3,7 @@ import { expect, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
 import { hiddenCommandInput, isLongCommand, runningDescription } from '../hooks/commands'
-import { countPatch, summarize } from '../hooks/summary'
+import { countPatch, fileRow, summarize } from '../hooks/summary'
 
 const CWD = '/repo'
 
@@ -87,13 +87,10 @@ async function drawnResult(
 	return text
 }
 
-test('an Edit result draws one summary line instead of the diff', async ($, on) => {
+test('an Edit result draws nothing: its row carries the counts', async ($, on) => {
 	world(on)
 	const text = await drawnResult($, 'Edit', EDIT_OUTPUT)
-	expect(text).toContain('  ⎿  ')
-	expect(text).toContain('Updated ')
-	expect(text).toContain('src/a.ts')
-	expect(text).toContain(' (+1 -1)')
+	expect(text).not.toContain('src/a.ts')
 	expect(text).not.toContain('engine diff')
 })
 
@@ -370,4 +367,73 @@ test('ctrl+o shows the answers', async ($, on) => {
 test('transcriptCommands: show keeps the answers', { options: { transcriptCommands: 'show' } }, async ($, on) => {
 	answersWorld(on)
 	expect(await drawnResult($, 'AskUserQuestion', ANSWERS)).toContain('Only while running')
+})
+
+const WRITE_OUTPUT = { type: 'create', filePath: '/repo/b.md', content: 'one\ntwo\nthree\n', structuredPatch: [] }
+
+test('fileRow titles a finished Edit as Update and a Write as Write, with one file', () => {
+	expect(fileRow('Edit', EDIT_OUTPUT, CWD)).toEqual({
+		name: 'Update',
+		summary: { verb: 'Updated', path: 'src/a.ts', added: 1, deleted: 1 },
+	})
+	expect(fileRow('Write', WRITE_OUTPUT, CWD)).toEqual({
+		name: 'Write',
+		summary: { verb: 'Created', path: 'b.md', added: 3 },
+	})
+	expect(fileRow('Bash', { stdout: '' }, CWD)).toBeUndefined()
+	expect(fileRow('Edit', undefined, CWD)).toBeUndefined()
+})
+
+async function drawnFileRow($: Engine, tool: string, output: unknown, state: RowState = {}) {
+	const ui = await $.ui.mount({
+		plugin: 'sideline',
+		surface: 'terminal',
+		component: 'ToolUse',
+		requestId: 'toolu_1',
+		props: {
+			tool_use_id: 'toolu_1',
+			tool,
+			input: { file_path: '/repo/src/a.ts' },
+			output,
+			isRunning: state.isRunning ?? false,
+			isErrored: state.isErrored ?? false,
+			isInterrupted: state.isInterrupted ?? false,
+			isExpanded: state.isExpanded ?? false,
+		},
+	})
+	const text = JSON.stringify(await ui.drawn())
+	await ui.unmount()
+	return text
+}
+
+test('a finished Edit row draws Update(path) with its counts on the same line', async ($, on) => {
+	world(on)
+	commandWorld(on)
+	const text = await drawnFileRow($, 'Edit', EDIT_OUTPUT)
+	expect(text).toContain('Update')
+	expect(text).toContain('(src/a.ts) ')
+	expect(text).toContain('(+1 -1)')
+	expect(text).not.toContain('engine')
+})
+
+test('a finished Write that created a file draws Write(path) (+N)', async ($, on) => {
+	world(on)
+	commandWorld(on)
+	const text = await drawnFileRow($, 'Write', WRITE_OUTPUT)
+	expect(text).toContain('(b.md) ')
+	expect(text).toContain('(+3)')
+})
+
+test('a running, errored or expanded Edit row is the engine row', async ($, on) => {
+	world(on)
+	commandWorld(on)
+	expect(await drawnFileRow($, 'Edit', undefined, { isRunning: true })).toContain('engine')
+	expect(await drawnFileRow($, 'Edit', 'File has not been read yet', { isErrored: true })).toContain('engine')
+	expect(await drawnFileRow($, 'Edit', EDIT_OUTPUT, { isExpanded: true })).toContain('engine')
+})
+
+test('transcriptDiffs: show keeps the engine Edit row', { options: { transcriptDiffs: 'show' } }, async ($, on) => {
+	world(on)
+	commandWorld(on)
+	expect(await drawnFileRow($, 'Edit', EDIT_OUTPUT)).toContain('engine')
 })

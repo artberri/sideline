@@ -52,6 +52,19 @@ export function countsLabel(summary: FileSummary): string {
 	return `(+${summary.added} -${summary.deleted ?? 0})`
 }
 
+// The tools whose row names one file, as Claude Code titles them; the counts join that title, so their result line,
+// which repeats the path, is dropped.
+const FILE_TOOL_NAMES: Record<string, string> = { Edit: 'Update', Write: 'Write' }
+
+export type FileRow = { name: string; summary: FileSummary }
+
+// The title a finished Edit or Write row is drawn with; `undefined` for any other tool or an output with no summary.
+export function fileRow(tool: string, output: unknown, cwd: string): FileRow | undefined {
+	const name = FILE_TOOL_NAMES[tool]
+	const [summary, ...rest] = (name && summarize(tool, output, cwd)) || []
+	return name && summary && rest.length === 0 ? { name, summary } : undefined
+}
+
 // The files a Bash command changed, as Claude Code reports them under `bashEditDiff`, by absolute path.
 export function bashChangedFiles(output: unknown): { path: string; isNewFile: boolean }[] {
 	if (!isRecord(output) || !isRecord(output.bashEditDiff) || !Array.isArray(output.bashEditDiff.files)) return []

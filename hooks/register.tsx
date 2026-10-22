@@ -16,7 +16,7 @@ import { readDiff, readSnapshot } from './git'
 import { rowIcon } from './icons'
 import { cutDiff, drawDiff, drawRows } from './rows'
 import type { RowSpec } from './rows'
-import { bashChangedFiles, countsLabel, summarize } from './summary'
+import { bashChangedFiles, countsLabel, fileRow, summarize } from './summary'
 import {
 	BRANCH_ICON,
 	backgroundOption,
@@ -301,6 +301,29 @@ export const register: Register = (on, options) => {
 		return {}
 	})
 
+	// A finished Edit or Write row carries its counts on its title line, and its result line (the same path again) is
+	// drawn as nothing below.
+	on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
+		const { tool, output, isRunning, isErrored, isInterrupted, isExpanded } = e.props
+		const isFileTool = tool === 'Edit' || tool === 'Write'
+		if (!isHidingDiffs || !isFileTool || isRunning || isErrored || isInterrupted || isExpanded === true)
+			return next(e)
+		const row = fileRow(tool, output, await $.session.cwd())
+		if (!row) return next(e)
+		const { Box, Text } = $.ui.resolve(e)
+		// Engine rows keep a blank line above them; a row drawn in their place doesn't get it.
+		return (
+			<Box marginTop={1}>
+				<Text>
+					<Text color="success">{`${rowDot} `}</Text>
+					<Text bold>{row.name}</Text>
+					{`(${row.summary.path}) `}
+					<Text dimColor>{countsLabel(row.summary)}</Text>
+				</Text>
+			</Box>
+		)
+	})
+
 	on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
 		const { tool, input, isErrored, isInterrupted, isExpanded } = e.props
 		if (!isHidingCommands || tool !== 'Bash' || isErrored || isInterrupted || isExpanded === true) return next(e)
@@ -345,9 +368,11 @@ export const register: Register = (on, options) => {
 
 	on('ui.render', { component: 'ToolResult' }, async ($, e, next) => {
 		if (!isHidingDiffs || e.props.isExpanded === true || e.props.isErrored) return next(e)
-		const summaries = summarize(e.props.tool, e.props.output, await $.session.cwd())
+		const cwd = await $.session.cwd()
+		const summaries = summarize(e.props.tool, e.props.output, cwd)
 		if (!summaries) return next(e)
 		const { Box, Text } = $.ui.resolve(e)
+		if (fileRow(e.props.tool, e.props.output, cwd)) return <Box />
 		return (
 			<Box flexDirection="column">
 				{summaries.map((summary) => (
