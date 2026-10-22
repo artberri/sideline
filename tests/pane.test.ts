@@ -16,6 +16,8 @@ type World = {
 	surfaces?: ('terminal' | 'desktop' | 'vscode' | 'mobile')[]
 	log?: string
 	logExit?: number
+	// The engine's pane list leaves the pane out, as it did once live.
+	isPaneUnlisted?: boolean
 	// A commit's files, as `git diff-tree --numstat -z` and `--name-status -z` print them, and its diffs by path.
 	commitNumstat?: string
 	commitNames?: string
@@ -56,10 +58,28 @@ function world(on: On, w: World, opens: string[]) {
 	on('session.surfaces', () => ({ value: w.surfaces ?? ['terminal'] }))
 	on('session.model', () => ({ value: 'claude-opus-5-5' }))
 	on('command.register', () => ({ value: { command: 'sideline' } }))
+	// The panes open now, as Claude Code would list them.
+	const open = new Set<string>()
 	on('ui.open', (_, e) => {
 		opens.push(e.id)
+		open.add(e.id)
 		return { value: { isPlaced: true } }
 	})
+	on('ui.close', (_, e) => {
+		opens.push(`close:${e.id}`)
+		open.delete(e.id)
+		return { value: undefined }
+	})
+	on('ui.panes', () => ({
+		value: [...(w.isPaneUnlisted ? [] : open)].map((id) => ({
+			id,
+			title: 'Changes',
+			isShown: true,
+			isFocused: false,
+			isPlaced: true,
+			plugin: 'sideline',
+		})),
+	}))
 	on('process.run', (_, e) => {
 		const argv = [...e.argv]
 		if (argv[0] === 'sh') return done(0, w.hasNerdFont ? 'nerd\n' : 'plain\n')
@@ -89,18 +109,44 @@ async function drawn($: Engine, surface: 'terminal' | 'desktop') {
 	return text
 }
 
-test('the pane opens at session start and again on /sideline', async ($, on) => {
+const sideline = (args = '') => ({
+	command: 'sideline',
+	args,
+	origin: { kind: 'composer' as const },
+	presentation: { isFullscreen: true, columns: 160 },
+})
+
+test('the pane opens at session start, and /sideline toggles it', async ($, on) => {
 	const opens: string[] = []
 	world(on, { status: STATUS }, opens)
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	expect(opens).toEqual(['sideline'])
-	await $.command.run({
-		command: 'sideline',
-		args: '',
-		origin: { kind: 'composer' },
-		presentation: { isFullscreen: true, columns: 160 },
-	})
-	expect(opens).toEqual(['sideline', 'sideline'])
+	expect((await $.command.run(sideline())).text).toBe('sideline pane closed.')
+	expect((await $.command.run(sideline())).text).toBe('sideline pane opened.')
+	expect(opens).toEqual(['sideline', 'close:sideline', 'sideline'])
+})
+
+test('/sideline open and /sideline close do only that', async ($, on) => {
+	const opens: string[] = []
+	world(on, { status: STATUS }, opens)
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	await $.command.run(sideline('open'))
+	await $.command.run(sideline('close'))
+	await $.command.run(sideline('close'))
+	expect(opens).toEqual(['sideline', 'sideline', 'close:sideline', 'close:sideline'])
+})
+
+test('a closed pane stays closed when the mod reloads, until it is opened again', async ($, on) => {
+	const opens: string[] = []
+	world(on, { status: STATUS }, opens)
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	await $.command.run(sideline('close'))
+	// A reload runs session.start again.
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	expect(opens).toEqual(['sideline', 'close:sideline'])
+	await $.command.run(sideline())
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	expect(opens).toEqual(['sideline', 'close:sideline', 'sideline', 'sideline'])
 })
 
 test('the header shows the branch and starship symbols, on every surface', async ($, on) => {
@@ -1328,4 +1374,14 @@ test('outside a repo with commandRows: 0, CHANGES keeps the space', { options: {
 	await ui.unmount()
 	expect(changes?.props.flexGrow).toBe(1)
 	expect(changes?.props.height).toBeUndefined()
+})
+
+test('/sideline closes an open pane even when the engine does not list it', async ($, on) => {
+	const opens: string[] = []
+	world(on, { status: STATUS, isPaneUnlisted: true }, opens)
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	await $.command.run(sideline())
+	await $.command.run(sideline())
+	await $.command.run(sideline())
+	expect(opens).toEqual(['sideline', 'close:sideline', 'sideline', 'close:sideline'])
 })

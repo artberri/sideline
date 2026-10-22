@@ -80,6 +80,10 @@ declare module 'claude-code' {
 			changesOffset: number
 			focusedCommand: string | null
 			viewing: CommitView | null
+			// The person closed the pane (its mark, ctrl+x x, /sideline); it stays closed through a reload of the mod.
+			isPaneClosed: boolean
+			// The mod opened the pane and nobody has closed it since.
+			isPaneOpen: boolean
 			session: SessionInfo
 			turn: TurnState
 		}

@@ -102,6 +102,8 @@ const session = atom(
 	} as SessionInfo,
 )
 // The commit opened in the changes box from the recent commits list, or null for the working changes.
+const isPaneClosed = atom({ plugin: 'sideline', key: 'isPaneClosed' } as const, false)
+const isPaneOpen = atom({ plugin: 'sideline', key: 'isPaneOpen' } as const, false)
 const viewing = atom({ plugin: 'sideline', key: 'viewing' } as const, null as CommitView | null)
 const focusedCommand = atom({ plugin: 'sideline', key: 'focusedCommand' } as const, null as string | null)
 const turn = atom({ plugin: 'sideline', key: 'turn' } as const, 'idle' as TurnState)
@@ -518,7 +520,11 @@ export const register: Register = (on, options) => {
 	const isShowingSession = options.sessionBox !== 'hide'
 
 	on('session.start', async ($, e, next) => {
-		await $.command.register({ name: 'sideline', description: 'Show the changed-files pane' })
+		await $.command.register({
+			name: 'sideline',
+			description: 'Toggle the sideline pane',
+			argumentHint: '[open|close]',
+		})
 		const resolved = await resolveGlyphs($, options.glyphs)
 		await update($, glyphs, () => resolved)
 		rowDot = await resolveRowDot($)
@@ -530,16 +536,39 @@ export const register: Register = (on, options) => {
 		await refresh($)
 		// The pane opens by itself where it is laid out for: the terminal and Claude Code Desktop. In VS Code or the
 		// mobile app alone it waits for /sideline.
-		if ((await $.session.surfaces()).some((surface) => OPENS_ON.has(surface)))
-			void $.ui.open({ id: PANE, title: TITLE })
+		const isWanted = !(await read($, isPaneClosed))
+		if (isWanted && (await $.session.surfaces()).some((surface) => OPENS_ON.has(surface)))
+			void $.ui.open({ id: PANE, title: TITLE }).then(() => update($, isPaneOpen, () => true))
 		$.clock.every(POLL_MS, () => void refresh($))
 		return next(e)
 	})
 
-	on('command.run', { command: 'sideline' }, async ($) => {
+	// /sideline toggles the pane; /sideline open and /sideline close do one or the other.
+	on('command.run', { command: 'sideline' }, async ($, e) => {
+		const arg = e.args.trim().toLowerCase()
+		// The engine's list, or the mod's own note when that list doesn't show the pane yet.
+		const isListed = (await $.ui.panes().catch(() => [])).some((pane) => pane.id === PANE)
+		const isOpen = isListed || (await read($, isPaneOpen))
+		const isClosing = arg === 'close' || (arg !== 'open' && isOpen)
+		if (isClosing) {
+			await update($, isPaneClosed, () => true)
+			await $.ui.close({ id: PANE })
+			return { text: 'sideline pane closed.' }
+		}
+		await update($, isPaneClosed, () => false)
 		await refresh($)
 		await $.ui.open({ id: PANE, title: TITLE })
-		return { text: 'Changes pane opened.' }
+		await update($, isPaneOpen, () => true)
+		return { text: 'sideline pane opened.' }
+	})
+
+	// The person closing the pane themselves (its mark, ctrl+x x) keeps it closed through reloads, until they open it.
+	on('ui.close', { id: PANE }, async ($, e, next) => {
+		await quietly(async () => {
+			await update($, isPaneOpen, () => false)
+			if (e.origin.kind === 'person') await update($, isPaneClosed, () => true)
+		})
+		return next(e)
 	})
 
 	// Only the main loop's turns: a subagent's start and end (`agentId`) come and go inside them.
