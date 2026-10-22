@@ -7,11 +7,11 @@ import type {
 	Cursor,
 	FileDiff,
 	FileStatus,
-	RunningCommand,
+	LoggedCommand,
 	Snapshot,
 	TurnState,
 } from '../types'
-import { commandLines, hiddenCommandInput, runningDescription } from './commands'
+import { LOG_SIZE, hiddenCommandInput, logLine, runningDescription } from './commands'
 import { readDiff, readSnapshot } from './git'
 import { rowIcon } from './icons'
 import { cutDiff, drawDiff, drawRows } from './rows'
@@ -34,6 +34,9 @@ const TITLE = 'Changes'
 const NAME = 'SIDELINE'
 const CHANGES_COLOR = 'claude'
 const COMMAND_COLOR = 'inactive'
+// Each log line starts with its command's state.
+const LOG_GLYPH: Record<LoggedCommand['state'], string> = { running: '●', done: '✓', failed: '✗' }
+const LOG_GLYPH_COLOR: Record<LoggedCommand['state'], Color> = { running: 'claude', done: 'success', failed: 'error' }
 // What a titled box takes from the width inside the pane: its border and its padding, each side.
 const BOX_FRAME = 4
 const POLL_MS = 2_000
@@ -58,7 +61,7 @@ const edits = atom({ plugin: 'sideline', key: 'edits' } as const, [] as ActiveEd
 const selected = atom({ plugin: 'sideline', key: 'selected' } as const, null as string | null)
 const diff = atom({ plugin: 'sideline', key: 'diff' } as const, null as FileDiff | null)
 const cursor = atom({ plugin: 'sideline', key: 'cursor' } as const, null as Cursor | null)
-const running = atom({ plugin: 'sideline', key: 'running' } as const, [] as RunningCommand[])
+const commands = atom({ plugin: 'sideline', key: 'commands' } as const, [] as LoggedCommand[])
 const turn = atom({ plugin: 'sideline', key: 'turn' } as const, 'idle' as TurnState)
 
 const STATUS_COLOR: Record<FileStatus, Color> = {
@@ -261,13 +264,27 @@ export const register: Register = (on, options) => {
 		}
 		const path = editedPath(e)
 		if (!path) {
-			const command = isHidingCommands && e.tool === 'Bash' ? e.command : undefined
-			if (command !== undefined) await update($, running, (list) => [...list, { id: e.tool_use_id, command }])
-			const result = await next(e).finally(() =>
-				command === undefined
-					? undefined
-					: update($, running, (list) => list.filter((one) => one.id !== e.tool_use_id)),
-			)
+			const command = e.tool === 'Bash' ? e.command : undefined
+			const id = e.tool_use_id
+			const settle = (state: LoggedCommand['state']) =>
+				update($, commands, (list) => list.map((one) => (one.id === id ? { ...one, state } : one)))
+			if (command !== undefined)
+				await update($, commands, (list) =>
+					[...list, { id, command, state: 'running' as const }].slice(-LOG_SIZE),
+				)
+			const result = await next(e).catch(async (error: unknown) => {
+				if (command !== undefined) await settle('failed')
+				throw error
+			})
+			if (command !== undefined) {
+				const output: unknown = result.result
+				const isInterrupted =
+					typeof output === 'object' &&
+					output !== null &&
+					'interrupted' in output &&
+					output.interrupted === true
+				await settle(result.deny || result.isError || isInterrupted ? 'failed' : 'done')
+			}
 			if (e.tool === 'Bash' && !result.deny && !result.isError) {
 				const startedAt = await $.clock.now()
 				for (const file of bashChangedFiles(result.result)) {
@@ -440,18 +457,42 @@ export const register: Register = (on, options) => {
 			</Box>
 		)
 		const changes = (body: JSX.Element) => titled('CHANGES', CHANGES_COLOR, body, 'changes')
+		const logged = await read($, commands)
+		const log = titled(
+			'COMMANDS',
+			COMMAND_COLOR,
+			<Box flexDirection="column">
+				{logged.length === 0 ? (
+					<Text dimColor>no commands yet</Text>
+				) : (
+					logged.map((entry) => (
+						<Text key={`command-${entry.id}`} wrap="truncate">
+							<Text color={LOG_GLYPH_COLOR[entry.state]}>{`${LOG_GLYPH[entry.state]} `}</Text>
+							<Text dimColor={entry.state !== 'running'}>
+								{logLine(entry.command, e.props.bodyColumns - 2 - BOX_FRAME - 2)}
+							</Text>
+						</Text>
+					))
+				)}
+			</Box>,
+			'commands',
+		)
 		if (shown.kind === 'loading')
 			return fill(
-				<Box flexDirection="column">
+				<Box flexDirection="column" flexGrow={1}>
 					{title}
 					{changes(<Text> </Text>)}
+					<Box flexGrow={1} />
+					{log}
 				</Box>,
 			)
 		if (shown.kind === 'none')
 			return fill(
-				<Box flexDirection="column">
+				<Box flexDirection="column" flexGrow={1}>
 					{title}
 					{changes(<Text dimColor>not a git repo</Text>)}
+					<Box flexGrow={1} />
+					{log}
 				</Box>,
 			)
 		const symbols = statusSymbols(shown.status)
@@ -463,8 +504,6 @@ export const register: Register = (on, options) => {
 		const opened = openPath !== null && openDiff?.path === openPath ? openDiff : null
 		const diffView = opened ? { path: opened.path, ...cutDiff(opened.hunks) } : null
 		const at = resolveCursor(treeRowsShown, await read($, cursor))
-		const commands = await read($, running)
-		const runningCommand = commands.at(-1)
 		const cursorId = treeRowsShown[at]?.id ?? null
 		const fileCount = treeRowsShown.filter((row) => row.kind === 'file').length
 		const rows = treeRowsShown.map((row): RowSpec => ({
@@ -581,21 +620,7 @@ export const register: Register = (on, options) => {
 					</Box>,
 				)}
 				<Box flexGrow={1} />
-				{runningCommand &&
-					titled(
-						'COMMAND',
-						COMMAND_COLOR,
-						<Box flexDirection="column">
-							{commandLines(runningCommand.command, e.props.bodyColumns - 2 - BOX_FRAME).map(
-								(line, index) => (
-									<Text key={`command-${index}`} dimColor>
-										{line}
-									</Text>
-								),
-							)}
-						</Box>,
-						'command',
-					)}
+				{log}
 			</Box>,
 		)
 	})

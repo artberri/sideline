@@ -1,6 +1,6 @@
 import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
-import { commandLines } from '../hooks/commands'
+import { logLine } from '../hooks/commands'
 import { cutDiff } from '../hooks/rows'
 import type { Engine } from 'claude-code/testing'
 
@@ -557,30 +557,68 @@ test('in a diff, j/k open the next or previous changed file, and h lands on the 
 
 const SCRIPT = 'sleep 8\ndate > /tmp/now.txt && git branch --show-current'
 
-test('commandLines shows up to three lines, cut to the width, and counts the rest', () => {
-	expect(commandLines('git status', 40)).toEqual(['$ git status'])
-	expect(commandLines('a\n\n  b   c\nd\ne\nf', 40)).toEqual(['$ a', '  b c', '  d', '  … 2 more lines'])
-	expect(commandLines('x'.repeat(50), 10)).toEqual(['$ xxxxxxx…'])
+test('logLine is the first line after $, cut to the width, with … for a script', () => {
+	expect(logLine('git status', 40)).toBe('$ git status')
+	expect(logLine('\n  a   b\nc', 40)).toBe('$ a b …')
+	expect(logLine('x'.repeat(50), 10)).toBe('$ xxxxxxx…')
 })
 
-test('a running Bash command shows at the bottom of the pane until it ends', async ($, on) => {
+async function logged($: Engine) {
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	const text = JSON.stringify(await ui.find({ key: 'commands' }))
+	await ui.unmount()
+	return text
+}
+
+test('the COMMANDS box is always at the bottom, empty at first', async ($, on) => {
+	world(on, { status: STATUS }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const text = await logged($)
+	expect(text).toContain(' COMMANDS ')
+	expect(text).toContain('no commands yet')
+	expect(text).toContain('"borderColor":"inactive"')
+})
+
+test('a running command reads ●, then ✓ once it ends, and stays in the log', async ($, on) => {
 	const w: World = { status: STATUS }
 	const clock = world(on, w, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	const finish = held(w)
 	const call = $.tool.call({ tool: 'Bash', command: SCRIPT, description: 'Wait, then save the date' })
 	await clock.settle()
-	const during = await drawn($, 'terminal')
-	expect(during).toContain('$ sleep 8')
-	expect(during).toContain('"borderColor":"inactive"')
-	expect(during).toContain(' COMMAND ')
-	expect(during).toContain('  date > /tmp/now.txt')
+	const during = await logged($)
+	expect(during).toContain('● ')
+	expect(during).toContain('$ sleep 8 …')
+	expect(during).not.toContain('date > /tmp/now.txt')
 	finish({ result: { stdout: '', stderr: '', interrupted: false } })
 	await call
 	await clock.settle()
-	const after = await drawn($, 'terminal')
-	expect(after).not.toContain('sleep 8')
-	expect(after).not.toContain('COMMAND')
+	const after = await logged($)
+	expect(after).toContain('✓ ')
+	expect(after).toContain('$ sleep 8 …')
+})
+
+test('a failed or interrupted command reads ✗', async ($, on) => {
+	const w: World = { status: STATUS }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	w.tool = () => ({ result: { stdout: '', stderr: '', interrupted: true } })
+	await $.tool.call({ tool: 'Bash', command: 'sleep 60' })
+	await clock.settle()
+	expect(await logged($)).toContain('✗ ')
+})
+
+test('the log keeps the last five commands, oldest first', async ($, on) => {
+	const w: World = { status: STATUS }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	for (const n of [1, 2, 3, 4, 5, 6]) await $.tool.call({ tool: 'Bash', command: `echo step${n}` })
+	await clock.settle()
+	const text = await logged($)
+	expect(text).not.toContain('step1')
+	const at = [2, 3, 4, 5, 6].map((n) => text.indexOf(`step${n}`))
+	expect(at.every((index) => index >= 0)).toBe(true)
+	expect([...at].sort((a, b) => a - b)).toEqual(at)
 })
 
 test('a long command line is cut to the width inside its box', async ($, on) => {
@@ -590,25 +628,21 @@ test('a long command line is cut to the width inside its box', async ($, on) => 
 	held(w)
 	void $.tool.call({ tool: 'Bash', command: `echo ${'y'.repeat(100)}` })
 	await clock.settle()
-	const text = await drawn($, 'terminal')
-	// 40 columns, less the pane's padding (2), the box's border (2) and the box's padding (2).
-	expect(text).toContain(`$ echo ${'y'.repeat(26)}…`)
-	expect(text).not.toContain('y'.repeat(27))
+	const text = await logged($)
+	// 40 columns, less the pane's padding (2), the box's border and padding (4) and the state glyph (2).
+	expect(text).toContain(`$ echo ${'y'.repeat(24)}…`)
+	expect(text).not.toContain('y'.repeat(25))
 })
 
-test(
-	'transcriptCommands: show keeps the command out of the pane',
-	{ options: { transcriptCommands: 'show' } },
-	async ($, on) => {
-		const w: World = { status: STATUS }
-		const clock = world(on, w, [])
-		await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
-		held(w)
-		void $.tool.call({ tool: 'Bash', command: SCRIPT })
-		await clock.settle()
-		expect(await drawn($, 'terminal')).not.toContain('sleep 8')
-	},
-)
+test('transcriptCommands: show still logs the command', { options: { transcriptCommands: 'show' } }, async ($, on) => {
+	const w: World = { status: STATUS }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	held(w)
+	void $.tool.call({ tool: 'Bash', command: SCRIPT })
+	await clock.settle()
+	expect(await logged($)).toContain('$ sleep 8 …')
+})
 
 const TURN = { turnId: 't1', text: 'go' }
 const ENDED = { turnId: 't1', answer: '', durationMs: 1, isAborted: false, reason: 'answer' } as const
@@ -690,6 +724,7 @@ test('outside a git repo the CHANGES box says so', async ($, on) => {
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
 	expect(JSON.stringify(await ui.find({ key: 'changes' }))).toContain('not a git repo')
+	expect(JSON.stringify(await ui.find({ key: 'commands' }))).toContain('no commands yet')
 	await ui.unmount()
 })
 

@@ -38,18 +38,16 @@ export function runningDescription(calls: readonly GroupCall[], previous?: strin
 	return isStreaming ? previous : describedCommand(running.input)?.description
 }
 
-// At most this many of a running command's lines show at the bottom of the pane.
-export const FOOTER_LINES = 3
+// The pane's log keeps this many commands, the newest last.
+export const LOG_SIZE = 5
 
-// A running command as the pane's footer draws it: up to FOOTER_LINES non-blank lines, the first after `$ `, each cut
-// to `columns` with an ellipsis, and a last line saying how many more there are.
-export function commandLines(command: string, columns: number): string[] {
+// A command as one line of the log: its first non-blank line with whitespace squeezed, after `$ `, cut to `columns`
+// with an ellipsis; a script with more lines ends in one too.
+export function logLine(command: string, columns: number): string {
 	const lines = command
 		.split('\n')
 		.map((line) => line.replace(/\s+/g, ' ').trim())
 		.filter((line) => line !== '')
-	const cut = (line: string) => (line.length > columns ? `${line.slice(0, Math.max(columns - 1, 0))}…` : line)
-	const shown = lines.slice(0, FOOTER_LINES).map((line, index) => cut(index === 0 ? `$ ${line}` : `  ${line}`))
-	const more = lines.length - shown.length
-	return more > 0 ? [...shown, cut(`  … ${more} more line${more === 1 ? '' : 's'}`)] : shown
+	const line = `$ ${lines[0] ?? ''}${lines.length > 1 ? ' …' : ''}`
+	return line.length > columns ? `${line.slice(0, Math.max(columns - 1, 0))}…` : line
 }

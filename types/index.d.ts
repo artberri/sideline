@@ -37,8 +37,9 @@ export type ActiveEdit = { id: string; path: string; state: 'running' | 'done'; 
 // The open file's diff against HEAD: unified hunks, or empty for a binary file.
 export type FileDiff = { path: string; hunks: string }
 
-// A Bash command Claude is running, by its tool_use_id, shown at the bottom of the pane.
-export type RunningCommand = { id: string; command: string }
+// A Bash command in the pane's log of the last few, by its tool_use_id: still running, finished, or failed (an error,
+// a refusal or an interruption).
+export type LoggedCommand = { id: string; command: string; state: 'running' | 'done' | 'failed' }
 
 // What Claude is doing, as the pane's title shows it: working through a turn, waiting on the person's answer to a
 // question or a plan, or waiting for a prompt.
@@ -56,7 +57,7 @@ declare module 'claude-code' {
 			selected: string | null
 			diff: FileDiff | null
 			cursor: Cursor | null
-			running: RunningCommand[]
+			commands: LoggedCommand[]
 			turn: TurnState
 		}
 	}
