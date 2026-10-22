@@ -14,14 +14,14 @@ changes (branch, tree, diff) in an orange box and the running command in a grey 
 - **B3.** The keyboard hints (`j down k up l open`, or `h back j next file k previous file` with a diff open) and the
   focus hint sit right under the title line, centred, and only when there are changes or an open diff. — _proved by:_ `tests/pane.test.ts` › "the hints sit under the title, above the tree, and only with changes", "with no changes the pane shows no hints"
 - **B4.** The branch line, the tree and the open diff are drawn inside a rounded box in the theme's `claude` colour
-  (orange). The branch line is the box's first row, with the number of changed files on its right. — _proved by:_
+  (orange). The branch line is the box's first row, with the number of changed files on its right. — _proved by:_ `tests/pane.test.ts` › "the branch, the file count and the tree sit in the orange CHANGES box"
 - **B5.** "no changes" and "not a git repo" show inside the same box; while the first snapshot loads, the box is
-  empty. — _proved by:_
+  empty. — _proved by:_ `tests/pane.test.ts` › "no changes and not a git repo show inside the CHANGES box", "outside a git repo the CHANGES box says so"
 - **B6.** While a Bash command runs, its lines show at the bottom of the pane in a rounded box in the theme's
-  `inactive` colour (grey); no box shows when none runs. — _proved by:_
-- **B7.** The command's lines are cut to the width inside the box, so the box never wraps. — _proved by:_
+  `inactive` colour (grey); no box shows when none runs. — _proved by:_ `tests/pane.test.ts` › "a running Bash command shows at the bottom of the pane until it ends"
+- **B7.** The command's lines are cut to the width inside the box, so the box never wraps. — _proved by:_ `tests/pane.test.ts` › "a long command line is cut to the width inside its box"
 - **B8.** Each box has a caps title at its top left, `CHANGES` and `COMMAND`: on the border (`╭─ CHANGES ───╮`) when
-  the overlay draws cleanly, else as the box's first row. — _proved by:_
+  the overlay draws cleanly, else as the box's first row. — _proved by:_ `tests/pane.test.ts` › "the branch, the file count and the tree sit in the orange CHANGES box", "a running Bash command shows at the bottom of the pane until it ends"; on the border: manual, live session
 - **B9.** While Claude waits on the person (a permission prompt, a question), the state reads `WAITING`, and goes back
   to `WORKING` once the tool runs or is refused. — _proved by:_
 - **B10.** The pane keeps its `background` option behind the boxes, and ctrl+x tab, clicks and the `j k l h` keys
@@ -45,7 +45,8 @@ Decisions (2026-10-22, with the user):
   up from the bottom of the pane.
 - **Box titles:** each box has a caps title at its top left. The engine's `Box` has no border-title prop (only
   `borderStyle`, `borderColor`, `borderDimColor`), but it has `position="absolute"` with `top`, so the title is first
-  laid over the top border; if that draws badly (over the `background` colour, or cut), it becomes the box's first row.
+  laid over the top border; if that draws badly (over the `background` colour, or cut), it becomes the box's first row. Found live: an overlay inside the bordered box doesn't show; a sibling drawn
+  after the box, in a plain wrapper at `top={0} left={2}`, does.
 - **Command box:** at the bottom of the pane, where the footer is now; the changes box stays at the top.
 - **Branch line:** inside the changes box as its first row, like flightdeck's card titles, with the file count on the
   right. With the fallback title, title and branch may share one row (`CHANGES · main [!?]   3 files`); pick live.
@@ -91,34 +92,34 @@ the keyboard hints move up under it.
 - [x] Move the hint buttons and `FOCUS_HINT` from the bottom block to under the title, centred.
 - [x] Run `bun run format` and `bun run check`.
 
-## Phase 2: Draw the changes and the running command in titled boxes
+## Phase 2: Draw the changes and the running command in titled boxes ✅
 
 **Description:** The branch line, tree and diff sit in an orange rounded box titled `CHANGES`; the running command
 sits in a grey rounded box titled `COMMAND` at the bottom of the pane.
 
 **Test Checklist:**
 
-- [ ] Pane test (B4): the changes box is drawn with `borderStyle` `round` and `borderColor` `claude`, the branch line
+- [x] Pane test (B4): the changes box is drawn with `borderStyle` `round` and `borderColor` `claude`, the branch line
       and `3 files` inside it.
-- [ ] Pane test (B5): "no changes" and "not a git repo" are inside the box.
-- [ ] Pane test (B6): while a command runs, a box with `borderColor` `inactive` holds its lines; none after it ends.
-- [ ] Pane test (B7): a long command line is cut to `bodyColumns - 6` (pane padding 2, border 2, box padding 2).
-- [ ] Pane test (B8): the drawn tree holds `CHANGES` and, while a command runs, `COMMAND`.
-- [ ] Manual, live session (B8): the title sits on the border cleanly — only a look shows how the overlay draws.
-- [ ] Manual, live session (B10): background, focus, clicks and keys — the `Client` rows and hotkeys can't be driven
+- [x] Pane test (B5): "no changes" and "not a git repo" are inside the box.
+- [x] Pane test (B6): while a command runs, a box with `borderColor` `inactive` holds its lines; none after it ends.
+- [x] Pane test (B7): a long command line is cut to `bodyColumns - 6` (pane padding 2, border 2, box padding 2).
+- [x] Pane test (B8): the drawn tree holds `CHANGES` and, while a command runs, `COMMAND`.
+- [x] Manual, live session (B8): the title sits on the border cleanly — only a look shows how the overlay draws.
+- [x] Manual, live session (B10): background, focus, clicks and keys — the `Client` rows and hotkeys can't be driven
       from a test.
 
 **To-do:**
 
-- [ ] Wrap the branch line and the rows / diff / empty text in `<Box borderStyle="round" borderColor="claude"
+- [x] Wrap the branch line and the rows / diff / empty text in `<Box borderStyle="round" borderColor="claude"
       paddingX={1} flexDirection="column">`; put the file count on the branch line's right.
-- [ ] Move "not a git repo" and the loading state into the same box, under the title and hints.
-- [ ] Wrap the footer in `<Box borderStyle="round" borderColor="inactive" paddingX={1}>`, still pushed to the bottom.
-- [ ] Give each box its caps title: a `position="absolute"` `top={0}` overlay at the top-left of the border
+- [x] Move "not a git repo" and the loading state into the same box, under the title and hints.
+- [x] Wrap the footer in `<Box borderStyle="round" borderColor="inactive" paddingX={1}>`, still pushed to the bottom.
+- [x] Give each box its caps title: a `position="absolute"` `top={0}` overlay at the top-left of the border
       (`CHANGES`, `COMMAND` in the border's colour, on the pane's background); check it live, and fall back to a
       bold first row inside the box if it draws badly.
-- [ ] Pass the inner width to `commandLines`, and check rows in `hooks/rows.tsx` don't overflow the box.
-- [ ] Run `bun run format` and `bun run check`.
+- [x] Pass the inner width to `commandLines`, and check rows in `hooks/rows.tsx` don't overflow the box.
+- [x] Run `bun run format` and `bun run check`.
 
 ## Phase 3: Show when Claude waits on the person
 
@@ -141,5 +142,5 @@ sits in a grey rounded box titled `COMMAND` at the bottom of the pane.
 
 ## Next step
 
-Phase 2: wrap the branch line, tree and diff in the orange `CHANGES` box and the running command in the grey
-`COMMAND` box, and try the titles on the border.
+Phase 3: probe live when a main-loop `tool.check` resolves to `ask` and when that call runs, then decide whether
+`WAITING` can be shown.

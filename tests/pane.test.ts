@@ -572,14 +572,18 @@ test('a running Bash command shows at the bottom of the pane until it ends', asy
 	await clock.settle()
 	const during = await drawn($, 'terminal')
 	expect(during).toContain('$ sleep 8')
+	expect(during).toContain('"borderColor":"inactive"')
+	expect(during).toContain(' COMMAND ')
 	expect(during).toContain('  date > /tmp/now.txt')
 	finish({ result: { stdout: '', stderr: '', interrupted: false } })
 	await call
 	await clock.settle()
-	expect(await drawn($, 'terminal')).not.toContain('sleep 8')
+	const after = await drawn($, 'terminal')
+	expect(after).not.toContain('sleep 8')
+	expect(after).not.toContain('COMMAND')
 })
 
-test('a long command line is cut to the pane width', async ($, on) => {
+test('a long command line is cut to the width inside its box', async ($, on) => {
 	const w: World = { status: STATUS }
 	const clock = world(on, w, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
@@ -587,8 +591,9 @@ test('a long command line is cut to the pane width', async ($, on) => {
 	void $.tool.call({ tool: 'Bash', command: `echo ${'y'.repeat(100)}` })
 	await clock.settle()
 	const text = await drawn($, 'terminal')
-	expect(text).toContain(`$ echo ${'y'.repeat(30)}…`)
-	expect(text).not.toContain('y'.repeat(32))
+	// 40 columns, less the pane's padding (2), the box's border (2) and the box's padding (2).
+	expect(text).toContain(`$ echo ${'y'.repeat(26)}…`)
+	expect(text).not.toContain('y'.repeat(27))
 })
 
 test(
@@ -655,4 +660,35 @@ test('an interrupted turn sets the title back to IDLE', async ($, on) => {
 	await $.turn.start(TURN)
 	await $.turn.complete({ ...ENDED, isAborted: true, reason: 'aborted' })
 	expect(await drawn($, 'terminal')).toContain('IDLE')
+})
+
+test('the branch, the file count and the tree sit in the orange CHANGES box', async ($, on) => {
+	world(on, { status: STATUS }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	const box = await ui.find({ key: 'changes-box' })
+	const text = JSON.stringify(await ui.find({ key: 'changes' }))
+	await ui.unmount()
+	expect(box?.props.borderStyle).toBe('round')
+	expect(box?.props.borderColor).toBe('claude')
+	expect(text).toContain(' CHANGES ')
+	expect(text).toContain('⎇ main')
+	expect(text).toContain(' 3 files')
+	expect(text).toContain('"name":"staged.ts"')
+})
+
+test('no changes and not a git repo show inside the CHANGES box', async ($, on) => {
+	world(on, { status: ['# branch.oid 0123456789abcdef', '# branch.head main', ''].join('\0') }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	expect(JSON.stringify(await ui.find({ key: 'changes' }))).toContain('no changes')
+	await ui.unmount()
+})
+
+test('outside a git repo the CHANGES box says so', async ($, on) => {
+	world(on, {}, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	expect(JSON.stringify(await ui.find({ key: 'changes' }))).toContain('not a git repo')
+	await ui.unmount()
 })

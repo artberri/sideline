@@ -32,6 +32,10 @@ import type { TreeRow } from './tree'
 const PANE = 'sideline'
 const TITLE = 'Changes'
 const NAME = 'SIDELINE'
+const CHANGES_COLOR = 'claude'
+const COMMAND_COLOR = 'inactive'
+// What a titled box takes from the width inside the pane: its border and its padding, each side.
+const BOX_FRAME = 4
 const POLL_MS = 2_000
 const REFRESH_AFTER = new Set(['Edit', 'Write', 'NotebookEdit', 'Bash'])
 const FLASH_MS = 100
@@ -381,14 +385,31 @@ export const register: Register = (on, options) => {
 				</Text>
 			</Box>
 		)
-		if (shown.kind === 'loading') return fill(title)
+		// A rounded box with its caps title laid over the top border, at the left: the title is a sibling drawn after the
+		// box, so it paints over the border rather than inside the box's clip.
+		const titled = (name: string, color: Color, body: JSX.Element, key: string) => (
+			<Box key={key} flexDirection="column" marginTop={1}>
+				<Box key={`${key}-box`} flexDirection="column" borderStyle="round" borderColor={color} paddingX={1}>
+					{body}
+				</Box>
+				<Box position="absolute" top={0} left={2}>
+					<Text color={color} bold backgroundColor={background}>{` ${name} `}</Text>
+				</Box>
+			</Box>
+		)
+		const changes = (body: JSX.Element) => titled('CHANGES', CHANGES_COLOR, body, 'changes')
+		if (shown.kind === 'loading')
+			return fill(
+				<Box flexDirection="column">
+					{title}
+					{changes(<Text> </Text>)}
+				</Box>,
+			)
 		if (shown.kind === 'none')
 			return fill(
 				<Box flexDirection="column">
 					{title}
-					<Box marginTop={1}>
-						<Text dimColor>not a git repo</Text>
-					</Box>
+					{changes(<Text dimColor>not a git repo</Text>)}
 				</Box>,
 			)
 		const symbols = statusSymbols(shown.status)
@@ -403,6 +424,7 @@ export const register: Register = (on, options) => {
 		const commands = await read($, running)
 		const runningCommand = commands.at(-1)
 		const cursorId = treeRowsShown[at]?.id ?? null
+		const fileCount = treeRowsShown.filter((row) => row.kind === 'file').length
 		const rows = treeRowsShown.map((row): RowSpec => ({
 			id: row.id,
 			kind: row.kind,
@@ -490,37 +512,48 @@ export const register: Register = (on, options) => {
 			<Box flexDirection="column" flexGrow={1}>
 				{title}
 				{hints}
-				<Box marginTop={1}>
-					<Text>
-						<Text color="magenta" bold>{`${icon} ${shown.branch}`}</Text>
-						{symbols && <Text color="red" bold>{` [${symbols}]`}</Text>}
-					</Text>
-				</Box>
-				<Box flexDirection="column" marginTop={1}>
-					{rows.length === 0 && !diffView ? (
-						<Text dimColor>no changes</Text>
-					) : 'Client' in elements ? (
-						<elements.Client
-							key="rows"
-							module="./rows.tsx"
-							props={{ rows, hoverBackground, diff: diffView, cursor: cursorId }}
-						/>
-					) : diffView ? (
-						drawDiff(diffView, elements, () => void closeDiff($))
-					) : (
-						drawRows({ rows, hoverBackground }, elements, 0, -1, cursorId)
-					)}
-				</Box>
-				<Box flexGrow={1} />
-				{runningCommand && (
-					<Box flexDirection="column" marginTop={1}>
-						{commandLines(runningCommand.command, e.props.bodyColumns - 2).map((line, index) => (
-							<Text key={`command-${index}`} dimColor>
-								{line}
+				{changes(
+					<Box flexDirection="column">
+						<Box justifyContent="space-between">
+							<Text wrap="truncate">
+								<Text color="magenta" bold>{`${icon} ${shown.branch}`}</Text>
+								{symbols && <Text color="red" bold>{` [${symbols}]`}</Text>}
 							</Text>
-						))}
-					</Box>
+							{fileCount > 0 && <Text dimColor>{` ${fileCount} file${fileCount === 1 ? '' : 's'}`}</Text>}
+						</Box>
+						<Box flexDirection="column" marginTop={1}>
+							{rows.length === 0 && !diffView ? (
+								<Text dimColor>no changes</Text>
+							) : 'Client' in elements ? (
+								<elements.Client
+									key="rows"
+									module="./rows.tsx"
+									props={{ rows, hoverBackground, diff: diffView, cursor: cursorId }}
+								/>
+							) : diffView ? (
+								drawDiff(diffView, elements, () => void closeDiff($))
+							) : (
+								drawRows({ rows, hoverBackground }, elements, 0, -1, cursorId)
+							)}
+						</Box>
+					</Box>,
 				)}
+				<Box flexGrow={1} />
+				{runningCommand &&
+					titled(
+						'COMMAND',
+						COMMAND_COLOR,
+						<Box flexDirection="column">
+							{commandLines(runningCommand.command, e.props.bodyColumns - 2 - BOX_FRAME).map(
+								(line, index) => (
+									<Text key={`command-${index}`} dimColor>
+										{line}
+									</Text>
+								),
+							)}
+						</Box>,
+						'command',
+					)}
 			</Box>,
 		)
 	})
