@@ -287,9 +287,19 @@ test('a live group keeps the last description while the next command is written'
 	expect(text).not.toContain('engine group')
 })
 
-test('a finished group draws the engine line', async ($, on) => {
+test('a finished group draws nothing', async ($, on) => {
 	groupWorld(on)
-	expect(await drawnGroup($, [{ ...longCall, isRunning: false }], { isActive: false })).toContain('engine group')
+	const text = await drawnGroup($, [{ ...longCall, isRunning: false }], { isActive: false })
+	expect(text).not.toContain('engine group')
+	expect(text).not.toContain(DESCRIPTION)
+})
+
+test('a finished group that loaded a CLAUDE.md, ran a hook or failed keeps the engine line', async ($, on) => {
+	groupWorld(on)
+	const done = { ...longCall, isRunning: false }
+	expect(await drawnGroup($, [done], { isActive: false, isCallsOnly: false })).toContain('engine group')
+	expect(await drawnGroup($, [{ ...done, isErrored: true }], { isActive: false })).toContain('engine group')
+	expect(await drawnGroup($, [done], { isActive: false, isExpanded: true })).toContain('engine group')
 })
 
 test('a live group running a Read, or with a failed call, draws the engine line', async ($, on) => {
@@ -333,6 +343,7 @@ test(
 	async ($, on) => {
 		groupWorld(on)
 		expect(await drawnGroup($, [longCall])).toContain('engine group')
+		expect(await drawnGroup($, [longCall], { isActive: false })).toContain('engine group')
 	},
 )
 

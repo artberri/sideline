@@ -32,7 +32,7 @@
 		"transcriptCommands": {
 			"type": "string",
 			"title": "Commands in the conversation",
-			"description": "hide: a long shell command Claude described shows its description instead of the command; show: the conversation shows commands as Claude Code draws them. ctrl+o always shows them.",
+			"description": "hide: a long shell command Claude described shows its description instead of the command, and finished \"Ran 1 shell command\" / \"Read 2 files\" lines go; show: the conversation shows them as Claude Code draws them. ctrl+o always shows them.",
 			"default": "hide",
 			"options": ["hide", "show"]
 		}

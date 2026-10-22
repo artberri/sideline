@@ -335,13 +335,17 @@ export const register: Register = (on, options) => {
 	// reaches, so the line is drawn here. Not only for a calls-only group: a nested CLAUDE.md the group loaded or a hook
 	// row turns that off, and the engine still prints the command. Those rows come back once the group folds.
 	on('ui.render', { component: 'ToolGroup' }, async ($, e, next) => {
-		const { calls, isActive, isExpanded } = e.props
+		const { calls, isActive, isExpanded, isCallsOnly } = e.props
 		const isFailed = calls.some((call) => call.isErrored || call.isInterrupted)
-		if (!isHidingCommands || !isActive || isExpanded || isFailed) return next(e)
+		if (!isHidingCommands || isExpanded || isFailed) return next(e)
+		// A finished group's count line (`Ran 1 shell command`) says nothing the rows around it don't; one that also
+		// loaded a CLAUDE.md or ran a hook keeps it.
+		if (!isActive && isCallsOnly !== true) return next(e)
+		const { Box, Text } = $.ui.resolve(e)
+		if (!isActive) return <Box />
 		const description = runningDescription(calls, lastDescription)
 		if (!description) return next(e)
 		lastDescription = description
-		const { Box, Text } = $.ui.resolve(e)
 		// Engine rows keep a blank line above them; a row drawn in their place doesn't get it.
 		return (
 			<Box marginTop={1}>
