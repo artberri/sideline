@@ -14,7 +14,7 @@ import type {
 } from '../types'
 import { LOG_SIZE, commandStep, hiddenCommandInput, logLine, runningDescription } from './commands'
 import { readDiff, readSnapshot } from './git'
-import { modelName } from './meter'
+import { USAGE_LABEL, USAGE_SEPARATOR, bar, barWidth, level, modelName, percentLabel, readings } from './meter'
 import { rowIcon } from './icons'
 import { cutDiff, drawDiff, drawRows } from './rows'
 import type { RowSpec } from './rows'
@@ -366,6 +366,8 @@ export const register: Register = (on, options) => {
 		// A host without a bound session (headless, an SDK host) has no model yet; the first request brings it.
 		const model = await $.session.model().catch(() => null)
 		if (model) await update($, session, (info) => ({ ...info, model }))
+		const usage = await $.session.usage().catch(() => null)
+		if (usage) await update($, session, (info) => ({ ...info, ...readings(usage) }))
 		await refresh($)
 		void $.ui.open({ id: PANE, title: TITLE })
 		$.clock.every(POLL_MS, () => void refresh($))
@@ -385,6 +387,12 @@ export const register: Register = (on, options) => {
 	})
 
 	// The main loop's model and effort as each of its requests goes out: /model and /effort show from the next one.
+	// Context and rate-limit readings arrive pushed, after each main turn and as a window moves a point.
+	on('session.measure', async ($, e, next) => {
+		await update($, session, (info) => ({ ...info, ...readings(e) }))
+		return next(e)
+	})
+
 	on('turn.step', async function* ($, e, next) {
 		if (e.agentId === undefined) {
 			const effort = e.effort === undefined ? null : String(e.effort)
@@ -624,12 +632,21 @@ export const register: Register = (on, options) => {
 					<Box justifyContent="space-between">
 						{branch}
 						<Text wrap="truncate">
-							{` ${info.model ? modelName(info.model) : '—'}`}
+							<Text color={SESSION_COLOR}>{` ${info.model ? modelName(info.model) : '—'}`}</Text>
 							<Text dimColor>{' · '}</Text>
-							{info.effort ?? '—'}
+							<Text color={SESSION_COLOR}>{info.effort ?? '—'}</Text>
 						</Text>
 					</Box>
-					<Text> </Text>
+					<Text wrap="truncate">
+						<Text dimColor>{USAGE_LABEL}</Text>
+						<Text
+							color={level(info.context)}
+						>{`${bar(info.context ?? 0, barWidth(e.props.bodyColumns - BOX_FRAME, [info.context, info.fiveHour, info.sevenDay].map(percentLabel)))} ${percentLabel(info.context)}`}</Text>
+						<Text dimColor>{`${USAGE_SEPARATOR}5h `}</Text>
+						<Text color={level(info.fiveHour)}>{percentLabel(info.fiveHour)}</Text>
+						<Text dimColor>{`${USAGE_SEPARATOR}7d `}</Text>
+						<Text color={level(info.sevenDay)}>{percentLabel(info.sevenDay)}</Text>
+					</Text>
 				</Box>,
 			)
 		const logged = await read($, commands)

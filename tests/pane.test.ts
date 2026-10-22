@@ -1014,3 +1014,41 @@ test(
 		expect(changes).toContain(' 3 files')
 	},
 )
+
+const USAGE = (percent: number, fiveHour: number, sevenDay: number) => ({
+	context: { window: 200_000, tokens: percent * 2_000, percent },
+	rateLimits: [
+		{ kind: 'five_hour', percentUsed: fiveHour, source: 'api' },
+		{ kind: 'seven_day', percentUsed: sevenDay, source: 'api' },
+	],
+})
+
+test('the SESSION box reads the context bar and the 5h and 7d usage, and follows each measure', async ($, on) => {
+	world(on, { status: STATUS }, [])
+	on('session.usage', () => ({ value: { startedAt: 0, ...USAGE(34, 23, 13) } }))
+	on('session.measure', (_, e) => ({ changed: e.changed }))
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const start = (await sessionBox($)).text
+	expect(start).toContain('context ')
+	// 36 cells inside the box, less 21 of text and 9 of numbers, leave a 6-cell bar.
+	expect(start).toContain('▰▰▱▱▱▱ 34%')
+	expect(start).toContain(' · 5h ')
+	expect(start).toContain('23%')
+	expect(start).toContain(' · 7d ')
+	expect(start).toContain('13%')
+	await $.session.measure({ ...USAGE(92, 80, 13), changed: ['context', 'rateLimits'] })
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	const context = await ui.find({ type: 'Text', text: /^[▰▱]+ 92%$/ })
+	const fiveHour = await ui.find({ type: 'Text', text: /^80%$/ })
+	await ui.unmount()
+	expect(context?.props.color).toBe('error')
+	expect(fiveHour?.props.color).toBe('warning')
+})
+
+test('before any reading the usage line reads —', async ($, on) => {
+	world(on, { status: STATUS }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const text = (await sessionBox($)).text
+	expect(text).toContain('▱▱▱ —')
+	expect(text).toContain(' · 5h ')
+})
