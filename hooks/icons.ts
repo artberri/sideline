@@ -1,6 +1,7 @@
 import type { Glyphs } from '../types'
 
-// Nerd Font code points, named as in nerd-fonts' glyphnames.json.
+// Nerd Font code points, named as in nerd-fonts' glyphnames.json. Nerd Fonts v3 or later: 33 were added in 3.0, and
+// U+E76F was another glyph in 2.x.
 const GLYPH = {
 	folderOpen: 0xe5fe, // custom-folder_open
 	file: 0xe64e, // seti-default

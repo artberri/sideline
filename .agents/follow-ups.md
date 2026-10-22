@@ -9,10 +9,9 @@ here (or move it into the plan) once it is planned.
   keys there; it draws, but without interaction. _From: the transcript-diffs and keyboard-navigation plans._
 - **Write a `README.md`.** `claude plugin validate` reports a missing README as the one problem left for submitting
   the mod to the plugin directory (the license is in place); it should say what the mod does, how to install it and its
-  options (`glyphs`, `background`, `transcriptDiffs`). _From: the validator's output since the scaffold._
-- **Check the file icons on a real Nerd Font.** The table in `hooks/icons.ts` was built from nerd-fonts'
-  `glyphnames.json` but never reviewed in the pane; swap any glyph that draws as a box or a blank. _From: adding the
-  file-type icons._
+  options (`glyphs`, `background`, `transcriptDiffs`, `transcriptCommands`, `sessionBox`). It should say the icons need
+  Nerd Fonts v3 (3.0 or later): 33 of them were added in 3.0, and `dev-bun` (U+E76F) was another glyph in 2.x.
+  _From: the validator's output since the scaffold, and the Nerd Font icon review._
 - **Fold other tools' long inputs.** Agent prompts and MCP calls can print long inputs in the transcript too; they
   could show a short label the way Bash rows show their description. _From: the hide-bash-commands plan._
 - **`tsc` fails on the first `$.tool.call` it checks.** Any test file that sorts before `tests/pane.test.ts` makes
