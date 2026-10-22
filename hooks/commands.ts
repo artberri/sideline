@@ -26,12 +26,12 @@ export function hiddenCommandInput(input: unknown): Record<string, unknown> | un
 
 type GroupCall = { tool: string; input: unknown; isRunning: boolean }
 
-// The description a live group's line shows in place of its current Bash call's long command; `undefined` when the
-// engine's own line is fine (another tool, a short or undescribed command). The current call is the running one, else
-// the last: a call is not running yet as the group appears, nor any more just before the group folds.
+// The description a live group's line shows in place of its current Bash call's command; `undefined` for another tool
+// or an undescribed command. Any length: under its line the engine prints the turn's latest command, even one that
+// isn't in the group. The current call is the running one, else the last: a call is not running yet as the group
+// appears, nor any more just before the group folds.
 export function runningDescription(calls: readonly GroupCall[]): string | undefined {
 	const running = [...calls].reverse().find((call) => call.isRunning) ?? calls.at(-1)
 	if (!running || running.tool !== 'Bash') return undefined
-	const described = describedCommand(running.input)
-	return described && isLongCommand(described.command) ? described.description : undefined
+	return describedCommand(running.input)?.description
 }

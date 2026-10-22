@@ -259,7 +259,8 @@ test('runningDescription reads the running call, else the last one', () => {
 	expect(runningDescription([done, read])).toBeUndefined()
 	expect(runningDescription([])).toBeUndefined()
 	expect(runningDescription([{ ...longCall, tool: 'Read' }])).toBeUndefined()
-	expect(runningDescription([{ ...longCall, input: { command: 'ls', description: 'List' } }])).toBeUndefined()
+	expect(runningDescription([{ ...longCall, input: { command: 'ls', description: 'List' } }])).toBe('List')
+	expect(runningDescription([{ ...longCall, input: { command: LONG } }])).toBeUndefined()
 })
 
 test('a live group running a long described command draws the description, not the command', async ($, on) => {
@@ -286,10 +287,17 @@ test('a live group running a Read, or not calls-only, draws the engine line', as
 	expect(await drawnGroup($, [longCall], { isCallsOnly: false })).toContain('engine group')
 })
 
-test('a live group running a short command draws the engine line', async ($, on) => {
+test('a live group hides a short described command too', async ($, on) => {
 	groupWorld(on)
-	const short = { ...longCall, input: { command: 'git status', description: 'Show status' } }
-	expect(await drawnGroup($, [short])).toContain('engine group')
+	const short = { ...longCall, input: { command: 'grep -n x a.ts', description: 'Find the x' } }
+	const text = await drawnGroup($, [short])
+	expect(text).toContain('Find the x')
+	expect(text).not.toContain('grep')
+})
+
+test('a live group running an undescribed command draws the engine line', async ($, on) => {
+	groupWorld(on)
+	expect(await drawnGroup($, [{ ...longCall, input: { command: LONG } }])).toContain('engine group')
 })
 
 test('ctrl+o draws the engine group line', async ($, on) => {

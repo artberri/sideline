@@ -254,8 +254,8 @@ export const register: Register = (on, options) => {
 		return hidden ? next({ ...e, props: { ...e.props, input: hidden } }) : next(e)
 	})
 
-	// The live line of a folded group draws its running command under the description, and that text is no prop a
-	// rewrite reaches, so the line is drawn here.
+	// The live line of a folded group draws a command under the description, and that text is no prop a rewrite
+	// reaches, so the line is drawn here.
 	on('ui.render', { component: 'ToolGroup' }, async ($, e, next) => {
 		const { calls, isActive, isExpanded, isCallsOnly } = e.props
 		if (!isHidingCommands || !isActive || isExpanded || isCallsOnly !== true) return next(e)

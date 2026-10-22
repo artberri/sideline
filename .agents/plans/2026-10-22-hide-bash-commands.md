@@ -12,14 +12,14 @@ the bottom of vacuo's pane, while it runs.
   line, not the command. — _proved by:_ `tests/transcript.test.tsx` › a finished long described Bash row draws the description, not the command; hiddenCommandInput puts the description in the command place
 - **B2.** A running Bash call whose command is long and that has a description shows the description and its timing,
   with no `$ command` line under it. — _proved by:_ `tests/transcript.test.tsx` › a running long described Bash row draws no command
-- **B3.** A Bash call with a short command (one line, at most 80 characters) or no description is drawn as Claude Code
-  draws it; vacuo never makes up a description. — _proved by:_ `tests/transcript.test.tsx` › isLongCommand is true for a newline or past 80 characters; a short command, or one without a description, keeps its row
+- **B3.** A Bash row (not a live group) with a short command (one line, at most 80 characters), or any Bash call with
+  no description, is drawn as Claude Code draws it; vacuo never makes up a description. — _proved by:_ `tests/transcript.test.tsx` › isLongCommand is true for a newline or past 80 characters; a short command, or one without a description, keeps its row
 - **B4.** An errored or interrupted Bash call is drawn as Claude Code draws it. — _proved by:_ `tests/transcript.test.tsx` › an errored or interrupted row keeps its command
 - **B5.** The "User answered Claude's questions" row shows its header line only, without the questions and answers
   under it. — _proved by:_
-- **B6.** While a folded group of calls is live and its running call is a Bash call with a long command and a
-  description, the group's line shows the description with no `$ command` under it; once the group is done it reads
-  `Ran N shell commands` as before. — _proved by:_ `tests/transcript.test.tsx` › a live group running a long described command draws the description, not the command; a finished group draws the engine line
+- **B6.** While a folded group of calls is live and its current call is a Bash call with a description (any length),
+  the group's line shows the description with no `$ command` under it; once the group is done it reads `Ran N shell
+  commands` as before. — _proved by:_ `tests/transcript.test.tsx` › a live group running a long described command draws the description, not the command; a live group hides a short described command too; a finished group draws the engine line
 - **B7.** A live group whose running call is not Bash (a Read, a Grep) is drawn as Claude Code draws it. — _proved by:_ `tests/transcript.test.tsx` › a live group running a Read, or not calls-only, draws the engine line
 - **B8.** While a Bash command runs, the bottom of the pane shows it dimmed as `$ <command>`, cut to the pane's width;
   the line is gone once no Bash command is running. — _proved by:_
@@ -33,8 +33,11 @@ the bottom of vacuo's pane, while it runs.
 
 - **Only the model's own `description` is used.** No model call to summarise a command: a call without a description
   keeps its command.
-- **Short one-liners stay.** `Bash(git status)` reads fine; a command is "long" when it has a newline or is over 80
-  characters. 80 is a fixed limit since `ToolUse` carries no width.
+- **A live group hides any described command, short ones too.** Seen live: under the line the engine prints the
+  turn's latest command, even one outside the group (a `sed` after a short `grep`), so passing a short call's line
+  to the engine leaked the next one.
+- **Short one-liners stay** in finished rows. `Bash(git status)` reads fine; a command is "long" when it has a newline
+  or is over 80 characters. 80 is a fixed limit since `ToolUse` carries no width.
 - **One option, `transcriptCommands: hide | show`** (default `hide`), next to `transcriptDiffs`, for the Bash rows, the
   live group line, the answers row and the pane footer. The answers row joins it because it is the same kind of noise:
   the transcript repeating input the person just saw or typed.
