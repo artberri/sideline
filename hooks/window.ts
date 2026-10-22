@@ -3,8 +3,8 @@ import { LOG_SIZE } from './commands'
 // The rows the pane spends outside the changes box's content: the title, the box's border, and the branch line with
 // the blank row under it.
 const CHANGES_CHROME = 1 + 2 + 2
-// The hint lines under the title, with the blank row above them.
-const HINT_ROWS = 3
+// The hint line under the title, with the blank row above it.
+const HINT_ROWS = 2
 // The commands box: its lines and its border.
 export const COMMANDS_ROWS = LOG_SIZE + 2
 

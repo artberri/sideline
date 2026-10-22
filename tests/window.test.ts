@@ -11,8 +11,8 @@ import {
 } from '../hooks/window'
 
 test('changesRows leaves the title, hints, borders, branch line and commands box out', () => {
-	// 40 rows: title 1, hints 3, the box's border 2, branch line and blank 2, commands 7.
-	expect(changesRows(40, true)).toBe(25)
+	// 40 rows: title 1, hints 2, the box's border 2, branch line and blank 2, commands 7.
+	expect(changesRows(40, true)).toBe(26)
 	expect(changesRows(40, false)).toBe(28)
 	expect(changesRows(5, true)).toBe(1)
 })

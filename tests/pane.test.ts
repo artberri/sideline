@@ -504,9 +504,6 @@ test('a legend of hotkey buttons explains the keys while there are changes', asy
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	const ui = await mountPane($)
 	const keys = async () => (await ui.findAll({ type: 'Button' })).map((button) => button.props.hotkey).filter(Boolean)
-	expect((await ui.find({ type: 'Text', text: /esc prompt/ }))?.text).toBe(
-		'click or ctrl+x tab to focus · esc prompt',
-	)
 	expect(await keys()).toEqual(['j', 'k', 'l'])
 	await ui.post({ press: 'modified.ts', kind: 'file' }, { in: 'rows' })
 	expect(await keys()).toEqual(['h', 'j', 'k'])
@@ -675,7 +672,7 @@ test('the hints sit under the title, above the tree, and only with changes', asy
 	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
 	const text = JSON.stringify(await ui.drawn())
 	await ui.unmount()
-	const hint = text.indexOf('ctrl+x tab')
+	const hint = text.indexOf('"label":"down"')
 	expect(text.indexOf('IDLE')).toBeLessThan(hint)
 	expect(hint).toBeLessThan(text.indexOf('main'))
 })
@@ -685,7 +682,7 @@ test('with no changes the pane shows no hints', async ($, on) => {
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	const text = await drawn($, 'terminal')
 	expect(text).toContain('no changes')
-	expect(text).not.toContain('ctrl+x tab')
+	expect(text).not.toContain('"label":"down"')
 })
 
 test('an interrupted turn sets the title back to IDLE', async ($, on) => {
@@ -862,12 +859,12 @@ async function shortPane($: Engine) {
 test('a short pane shows a window of the tree and counts the rest on the border', async ($, on) => {
 	world(on, { status: MANY }, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
-	// 20 rows: title 1, hints 3, the box's border 2, branch line and blank 2, commands 7 leave 5.
+	// 20 rows: title 1, hints 2, the box's border 2, branch line and blank 2, commands 7 leave 6.
 	const box = await shortPane($)
 	expect(box).toContain('file00.ts')
-	expect(box).toContain('file04.ts')
-	expect(box).not.toContain('file05.ts')
-	expect(box).toContain(' ↓ 7 ')
+	expect(box).toContain('file05.ts')
+	expect(box).not.toContain('file06.ts')
+	expect(box).toContain(' ↓ 6 ')
 })
 
 // A wheel tick, or with no `row` a scroll key, on the 20-row pane.
@@ -890,9 +887,9 @@ test('the wheel over CHANGES moves its window, and never the pane', async ($, on
 	const box = await shortPane($)
 	expect(box).not.toContain('file02.ts')
 	expect(box).toContain('file03.ts')
-	expect(box).toContain(' ↑ 3 ↓ 4 ')
+	expect(box).toContain(' ↑ 3 ↓ 3 ')
 	await $.ui.scroll(wheel(50, 6))
-	expect(await shortPane($)).toContain(' ↑ 7 ')
+	expect(await shortPane($)).toContain(' ↑ 6 ')
 })
 
 test('the wheel over COMMANDS moves nothing', async ($, on) => {
@@ -903,13 +900,10 @@ test('the wheel over COMMANDS moves nothing', async ($, on) => {
 	expect(await shortPane($)).toContain('file00.ts')
 })
 
-test('the focus hint is cut to one row, never wrapped', async ($, on) => {
+test('the pane has no focus hint line', async ($, on) => {
 	world(on, { status: STATUS }, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
-	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-	const hint = await ui.find({ type: 'Text', text: /ctrl\+x tab/ })
-	await ui.unmount()
-	expect(hint?.props.wrap).toBe('truncate-end')
+	expect(await drawn($, 'terminal')).not.toContain('to focus')
 })
 
 test('j past the window moves it down by one, and k above it moves it back up', async ($, on) => {
@@ -921,14 +915,14 @@ test('j past the window moves it down by one, and k above it moves it back up', 
 		props: { ...PANE.props, scroll: { offset: 0, bodyRows: 20 } },
 	})
 	const box = async () => JSON.stringify(await ui.find({ key: 'changes' }))
-	// The window shows five rows, file00 to file04; the first j selects file00, four more reach file04.
-	for (let n = 0; n < 5; n++) await ui.key({ key: 'j', in: 'rows' })
+	// The window shows six rows, file00 to file05; the first j selects file00, five more reach file05.
+	for (let n = 0; n < 6; n++) await ui.key({ key: 'j', in: 'rows' })
 	expect(await box()).toContain('file00.ts')
 	await ui.key({ key: 'j', in: 'rows' })
 	const down = await box()
 	expect(down).not.toContain('file00.ts')
-	expect(down).toContain('file05.ts')
-	for (let n = 0; n < 5; n++) await ui.key({ key: 'k', in: 'rows' })
+	expect(down).toContain('file06.ts')
+	for (let n = 0; n < 6; n++) await ui.key({ key: 'k', in: 'rows' })
 	expect(await box()).toContain('file00.ts')
 	await ui.unmount()
 })
@@ -938,5 +932,5 @@ test('a scroll key (no pointer) scrolls CHANGES', async ($, on) => {
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	await shortPane($)
 	await $.ui.scroll(wheel(2))
-	expect(await shortPane($)).toContain(' ↑ 2 ↓ 5 ')
+	expect(await shortPane($)).toContain(' ↑ 2 ↓ 4 ')
 })

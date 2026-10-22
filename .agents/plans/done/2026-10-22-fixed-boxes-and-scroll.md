@@ -19,8 +19,9 @@ command, which now opens there instead of unfolding in the log.
   sides that apply); nothing shows when it all fits. — _proved by:_ `tests/pane.test.ts` › "a short pane shows a window of the tree and counts the rest on the border"; `tests/window.test.ts` › "hiddenLabel counts the lines above and below, only the sides that have some"
 - **B6.** `j`/`k` keep the selected row in view, the arrow and page keys scroll `CHANGES`, and opening a diff or a
   command starts at its top. — _proved by:_ `tests/pane.test.ts` › "j past the window moves it down by one, and k above it moves it back up", "a scroll key (no pointer) scrolls CHANGES"; `tests/window.test.ts` › "revealOffset moves the window just enough to show the line"
-- **B7.** The hint line under the title stays one row on a narrow pane (cut, not wrapped), so the boxes' rows add
-  up. — _proved by:_ `tests/pane.test.ts` › "the focus hint is cut to one row, never wrapped"
+- **B7.** The pane has no focus hint line ("click or ctrl+x tab to focus · esc prompt", dropped after Phase 3 as asked
+  live); the hint buttons are one row, so the boxes' rows add up. — _proved by:_ `tests/pane.test.ts` › "the pane has
+  no focus hint line"
 
 ## Context
 
