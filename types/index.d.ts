@@ -45,6 +45,16 @@ export type LoggedCommand = { id: string; command: string; state: 'running' | 'd
 // question or a plan, or waiting for a prompt.
 export type TurnState = 'idle' | 'working' | 'waiting'
 
+// What the session box shows, each null until Claude Code has reported it: the main loop's model id and effort, the
+// context used and the 5-hour and 7-day usage, in percent.
+export type SessionInfo = {
+	model: string | null
+	effort: string | null
+	context: number | null
+	fiveHour: number | null
+	sevenDay: number | null
+}
+
 // The selected row: its id, and its index so the selection can fall to the nearest row when it leaves the tree.
 export type Cursor = { id: string; index: number }
 
@@ -61,6 +71,7 @@ declare module 'claude-code' {
 			openCommand: string | null
 			changesOffset: number
 			focusedCommand: string | null
+			session: SessionInfo
 			turn: TurnState
 		}
 	}

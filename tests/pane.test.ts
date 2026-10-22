@@ -46,6 +46,7 @@ function world(on: On, w: World, opens: string[]) {
 	const clock = mock.clock(on, { now: 1_800_000_000_000 })
 	on('session.start', (_, e) => ({ cwd: e.cwd }))
 	on('session.cwd', () => ({ value: '/repo' }))
+	on('session.model', () => ({ value: 'claude-opus-5-5' }))
 	on('command.register', () => ({ value: { command: 'sideline' } }))
 	on('ui.open', (_, e) => {
 		opens.push(e.id)
@@ -693,7 +694,7 @@ test('an interrupted turn sets the title back to IDLE', async ($, on) => {
 	expect(await drawn($, 'terminal')).toContain('IDLE')
 })
 
-test('the branch, the file count and the tree sit in the orange CHANGES box', async ($, on) => {
+test('the file count and the tree sit in the purple CHANGES box', async ($, on) => {
 	world(on, { status: STATUS }, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
@@ -701,10 +702,12 @@ test('the branch, the file count and the tree sit in the orange CHANGES box', as
 	const text = JSON.stringify(await ui.find({ key: 'changes' }))
 	await ui.unmount()
 	expect(box?.props.borderStyle).toBe('round')
-	expect(box?.props.borderColor).toBe('claude')
+	expect(box?.props.borderColor).toBe('merged')
 	expect(text).toContain(' CHANGES ')
-	expect(text).toContain('⎇ main')
-	expect(text).toContain(' 3 files')
+	expect(text).not.toContain('⎇ main')
+	// The file count is laid over the box's top-right border.
+	expect(text).toContain('"top":0,"right":2')
+	expect(text).toContain(' 3 files ')
 	expect(text).toContain('"name":"staged.ts"')
 })
 
@@ -716,11 +719,11 @@ test('no changes and not a git repo show inside the CHANGES box', async ($, on) 
 	await ui.unmount()
 })
 
-test('outside a git repo the CHANGES box says so', async ($, on) => {
+test('outside a git repo the SESSION box says so', async ($, on) => {
 	world(on, {}, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-	expect(JSON.stringify(await ui.find({ key: 'changes' }))).toContain('not a git repo')
+	expect(JSON.stringify(await ui.find({ key: 'session' }))).toContain('not a git repo')
 	expect(JSON.stringify(await ui.find({ key: 'commands' }))).toContain('no commands yet')
 	await ui.unmount()
 })
@@ -859,12 +862,12 @@ async function shortPane($: Engine) {
 test('a short pane shows a window of the tree and counts the rest on the border', async ($, on) => {
 	world(on, { status: MANY }, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
-	// 20 rows: title 1, hints 2, the box's border 2, branch line and blank 2, commands 7 leave 6.
+	// 20 rows: title 1, hints 2, session box 4, the changes border 2, commands 7 leave 4.
 	const box = await shortPane($)
 	expect(box).toContain('file00.ts')
-	expect(box).toContain('file05.ts')
-	expect(box).not.toContain('file06.ts')
-	expect(box).toContain(' ↓ 6 ')
+	expect(box).toContain('file03.ts')
+	expect(box).not.toContain('file04.ts')
+	expect(box).toContain(' ↓ 8 ')
 })
 
 // A wheel tick, or with no `row` a scroll key, on the 20-row pane.
@@ -887,9 +890,9 @@ test('the wheel over CHANGES moves its window, and never the pane', async ($, on
 	const box = await shortPane($)
 	expect(box).not.toContain('file02.ts')
 	expect(box).toContain('file03.ts')
-	expect(box).toContain(' ↑ 3 ↓ 3 ')
+	expect(box).toContain(' ↑ 3 ↓ 5 ')
 	await $.ui.scroll(wheel(50, 6))
-	expect(await shortPane($)).toContain(' ↑ 6 ')
+	expect(await shortPane($)).toContain(' ↑ 8 ')
 })
 
 test('the wheel over COMMANDS moves nothing', async ($, on) => {
@@ -915,14 +918,14 @@ test('j past the window moves it down by one, and k above it moves it back up', 
 		props: { ...PANE.props, scroll: { offset: 0, bodyRows: 20 } },
 	})
 	const box = async () => JSON.stringify(await ui.find({ key: 'changes' }))
-	// The window shows six rows, file00 to file05; the first j selects file00, five more reach file05.
-	for (let n = 0; n < 6; n++) await ui.key({ key: 'j', in: 'rows' })
+	// The window shows four rows, file00 to file03; the first j selects file00, three more reach file03.
+	for (let n = 0; n < 4; n++) await ui.key({ key: 'j', in: 'rows' })
 	expect(await box()).toContain('file00.ts')
 	await ui.key({ key: 'j', in: 'rows' })
 	const down = await box()
 	expect(down).not.toContain('file00.ts')
-	expect(down).toContain('file06.ts')
-	for (let n = 0; n < 6; n++) await ui.key({ key: 'k', in: 'rows' })
+	expect(down).toContain('file04.ts')
+	for (let n = 0; n < 4; n++) await ui.key({ key: 'k', in: 'rows' })
 	expect(await box()).toContain('file00.ts')
 	await ui.unmount()
 })
@@ -932,7 +935,7 @@ test('a scroll key (no pointer) scrolls CHANGES', async ($, on) => {
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	await shortPane($)
 	await $.ui.scroll(wheel(2))
-	expect(await shortPane($)).toContain(' ↑ 2 ↓ 4 ')
+	expect(await shortPane($)).toContain(' ↑ 2 ↓ 6 ')
 })
 
 test('the c commands hint shows only once a command is logged', async ($, on) => {
@@ -960,3 +963,54 @@ test('the c hint reads commands, and changes once c has moved into the log', asy
 	expect(await label()).toBe('commands')
 	await ui.unmount()
 })
+
+// One main-loop model request, as the engine raises it, read to its end.
+async function requested($: Engine, model: string, effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max') {
+	const stream = $.turn.step({ turnId: 't1', index: 0, model, effort, messageCount: 1 })
+	for await (const _ of stream);
+	await stream.result
+}
+
+async function sessionBox($: Engine) {
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	const box = await ui.find({ key: 'session-box' })
+	const text = JSON.stringify(await ui.find({ key: 'session' }))
+	await ui.unmount()
+	return { box, text }
+}
+
+test('the yellow SESSION box reads the branch, the model, and the effort once a request brings it', async ($, on) => {
+	world(on, { status: STATUS, hasStash: true }, [])
+	// The model answers with no chunks; this test only needs the request to go out.
+	on('turn.step', async function* (_, e) {
+		yield* []
+		return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'end_turn', usage: null }
+	})
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const before = await sessionBox($)
+	expect(before.box?.props.borderColor).toBe('yellow')
+	expect(before.text).toContain(' SESSION ')
+	expect(before.text).toContain('⎇ main')
+	expect(before.text).toContain(' [$!+?]')
+	expect(before.text).toContain(' Opus 5.5')
+	expect(before.text).toContain('—')
+	await requested($, 'claude-sonnet-5-5', 'high')
+	const after = await sessionBox($)
+	expect(after.text).toContain(' Sonnet 5.5')
+	expect(after.text).toContain('high')
+})
+
+test(
+	'sessionBox: hide draws no SESSION box and puts the branch line back in CHANGES',
+	{ options: { sessionBox: 'hide' } },
+	async ($, on) => {
+		world(on, { status: STATUS }, [])
+		await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+		const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+		expect(await ui.find({ key: 'session' })).toBeUndefined()
+		const changes = JSON.stringify(await ui.find({ key: 'changes' }))
+		await ui.unmount()
+		expect(changes).toContain('⎇ main')
+		expect(changes).toContain(' 3 files')
+	},
+)

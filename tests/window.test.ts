@@ -11,11 +11,13 @@ import {
 	wrapLines,
 } from '../hooks/window'
 
-test('changesRows leaves the title, hints, borders, branch line and commands box out', () => {
-	// 40 rows: title 1, hints 2, the box's border 2, branch line and blank 2, commands 7.
-	expect(changesRows(40, true)).toBe(26)
-	expect(changesRows(40, false)).toBe(28)
-	expect(changesRows(5, true)).toBe(1)
+test('changesRows leaves the title, hints, the session box or branch line, borders and commands box out', () => {
+	// 40 rows: title 1, hints 2, session box 4, the changes border 2, commands 7.
+	expect(changesRows(40, true, true)).toBe(24)
+	// Without the session box the branch line and its blank row (2) are in the changes box instead.
+	expect(changesRows(40, true, false)).toBe(26)
+	expect(changesRows(40, false, true)).toBe(26)
+	expect(changesRows(5, true, true)).toBe(1)
 })
 
 test('clampOffset keeps the window inside the content', () => {

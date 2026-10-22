@@ -8,11 +8,13 @@ import type {
 	FileDiff,
 	FileStatus,
 	LoggedCommand,
+	SessionInfo,
 	Snapshot,
 	TurnState,
 } from '../types'
 import { LOG_SIZE, commandStep, hiddenCommandInput, logLine, runningDescription } from './commands'
 import { readDiff, readSnapshot } from './git'
+import { modelName } from './meter'
 import { rowIcon } from './icons'
 import { cutDiff, drawDiff, drawRows } from './rows'
 import type { RowSpec } from './rows'
@@ -33,7 +35,8 @@ import type { TreeRow } from './tree'
 const PANE = 'sideline'
 const TITLE = 'Changes'
 const NAME = 'SIDELINE'
-const CHANGES_COLOR = 'claude'
+const CHANGES_COLOR = 'merged'
+const SESSION_COLOR = 'yellow'
 const COMMAND_COLOR = 'inactive'
 // Each log line starts with its command's state.
 const LOG_GLYPH: Record<LoggedCommand['state'], string> = { running: '●', done: '✓', failed: '✗' }
@@ -70,6 +73,16 @@ const openCommand = atom({ plugin: 'sideline', key: 'openCommand' } as const, nu
 // The first line the changes box shows of its tree, diff or command.
 const changesOffset = atom({ plugin: 'sideline', key: 'changesOffset' } as const, 0)
 // The logged command whose line holds the pane's focus ring, by tool_use_id: while set, j/k move between commands.
+const session = atom(
+	{ plugin: 'sideline', key: 'session' } as const,
+	{
+		model: null,
+		effort: null,
+		context: null,
+		fiveHour: null,
+		sevenDay: null,
+	} as SessionInfo,
+)
 const focusedCommand = atom({ plugin: 'sideline', key: 'focusedCommand' } as const, null as string | null)
 const turn = atom({ plugin: 'sideline', key: 'turn' } as const, 'idle' as TurnState)
 
@@ -289,14 +302,22 @@ async function finishEdit($: EngineInterface, id: string, startedAt: number): Pr
 	else flash()
 }
 
-type TitledBox = { name: string; color: Color; key: string; rows?: number; footer?: string; background?: string }
+type TitledBox = {
+	name: string
+	color: Color
+	key: string
+	rows?: number
+	label?: string
+	footer?: string
+	background?: string
+}
 
-// A rounded box with its caps title laid over the top border, at the left, and `footer` over the bottom border, at the
-// right: each a sibling drawn after the box, so it paints over the border rather than inside the box's clip. `rows`
+// A rounded box with its caps title laid over the top border, at the left, `label` over it at the right, and `footer`
+// over the bottom border, at the right: each a sibling drawn after the box, so it paints over the border rather than inside the box's clip. `rows`
 // fixes the box's content rows; without it the box takes every row left.
 function titled(
 	{ Box, Text }: Pick<ClientElements, 'Box' | 'Text'>,
-	{ name, color, key, rows, footer = '', background }: TitledBox,
+	{ name, color, key, rows, label = '', footer = '', background }: TitledBox,
 	body: JSX.Element,
 ) {
 	return (
@@ -316,6 +337,11 @@ function titled(
 			<Box position="absolute" top={0} left={2}>
 				<Text color={color} bold backgroundColor={background}>{` ${name} `}</Text>
 			</Box>
+			{label !== '' && (
+				<Box position="absolute" top={0} right={2}>
+					<Text color={color} backgroundColor={background}>{` ${label} `}</Text>
+				</Box>
+			)}
 			{footer !== '' && (
 				<Box position="absolute" bottom={0} right={2}>
 					<Text color={color} backgroundColor={background}>{` ${footer} `}</Text>
@@ -330,12 +356,16 @@ export const register: Register = (on, options) => {
 	const hoverBackground = background ? lighten(background) : null
 	const isHidingDiffs = options.transcriptDiffs !== 'show'
 	const isHidingCommands = options.transcriptCommands !== 'show'
+	const isShowingSession = options.sessionBox !== 'hide'
 
 	on('session.start', async ($, e, next) => {
 		await $.command.register({ name: 'sideline', description: 'Show the changed-files pane' })
 		const resolved = await resolveGlyphs($, options.glyphs)
 		await update($, glyphs, () => resolved)
 		rowDot = await resolveRowDot($)
+		// A host without a bound session (headless, an SDK host) has no model yet; the first request brings it.
+		const model = await $.session.model().catch(() => null)
+		if (model) await update($, session, (info) => ({ ...info, model }))
 		await refresh($)
 		void $.ui.open({ id: PANE, title: TITLE })
 		$.clock.every(POLL_MS, () => void refresh($))
@@ -352,6 +382,17 @@ export const register: Register = (on, options) => {
 	on('turn.start', async ($, e, next) => {
 		if (e.agentId === undefined) await update($, turn, () => 'working')
 		return next(e)
+	})
+
+	// The main loop's model and effort as each of its requests goes out: /model and /effort show from the next one.
+	on('turn.step', async function* ($, e, next) {
+		if (e.agentId === undefined) {
+			const effort = e.effort === undefined ? null : String(e.effort)
+			await update($, session, (info) =>
+				info.model === e.model && info.effort === effort ? info : { ...info, model: e.model, effort },
+			)
+		}
+		return yield* next(e)
 	})
 
 	on('turn.complete', async ($, e, next) => {
@@ -570,8 +611,27 @@ export const register: Register = (on, options) => {
 				</Text>
 			</Box>
 		)
-		const changes = (body: JSX.Element, footer = '') =>
-			titled(elements, { name: 'CHANGES', color: CHANGES_COLOR, key: 'changes', footer, background }, body)
+		const changes = (body: JSX.Element, footer = '', label = '') =>
+			titled(elements, { name: 'CHANGES', color: CHANGES_COLOR, key: 'changes', label, footer, background }, body)
+		const info = await read($, session)
+		// The session box: the branch line, then the model and effort, on its first line.
+		const sessionBox = (branch: JSX.Element) =>
+			isShowingSession &&
+			titled(
+				elements,
+				{ name: 'SESSION', color: SESSION_COLOR, key: 'session', rows: 2, background },
+				<Box flexDirection="column">
+					<Box justifyContent="space-between">
+						{branch}
+						<Text wrap="truncate">
+							{` ${info.model ? modelName(info.model) : '—'}`}
+							<Text dimColor>{' · '}</Text>
+							{info.effort ?? '—'}
+						</Text>
+					</Box>
+					<Text> </Text>
+				</Box>,
+			)
 		const logged = await read($, commands)
 		const isInCommands = (await read($, focusedCommand)) !== null
 		const open = await read($, openCommand)
@@ -599,6 +659,7 @@ export const register: Register = (on, options) => {
 			return fill(
 				<Box flexDirection="column" flexGrow={1}>
 					{title}
+					{sessionBox(<Text> </Text>)}
 					{changes(<Text> </Text>)}
 					{log}
 				</Box>,
@@ -607,7 +668,8 @@ export const register: Register = (on, options) => {
 			return fill(
 				<Box flexDirection="column" flexGrow={1}>
 					{title}
-					{changes(<Text dimColor>not a git repo</Text>)}
+					{sessionBox(<Text dimColor>not a git repo</Text>)}
+					{changes(isShowingSession ? <Text> </Text> : <Text dimColor>not a git repo</Text>)}
 					{log}
 				</Box>,
 			)
@@ -724,7 +786,14 @@ export const register: Register = (on, options) => {
 				</Box>
 			</Box>
 		)
-		const windowRows = changesRows(e.props.scroll.bodyRows, Boolean(hints))
+		const branchLine = (
+			<Text wrap="truncate">
+				<Text color="magenta" bold>{`${icon} ${shown.branch}`}</Text>
+				{symbols && <Text color="red" bold>{` [${symbols}]`}</Text>}
+			</Text>
+		)
+		const filesLabel = `${fileCount} file${fileCount === 1 ? '' : 's'}`
+		const windowRows = changesRows(e.props.scroll.bodyRows, Boolean(hints), isShowingSession)
 		const innerColumns = e.props.bodyColumns - BOX_FRAME
 		const commandRows = commandView ? wrapLines(commandView.command, innerColumns) : []
 		const diffLines = diffView && diffView.hunks !== '' ? diffView.hunks.replace(/\n$/, '').split('\n') : []
@@ -743,16 +812,16 @@ export const register: Register = (on, options) => {
 			<Box flexDirection="column" flexGrow={1}>
 				{title}
 				{hints}
+				{sessionBox(branchLine)}
 				{changes(
 					<Box flexDirection="column">
-						<Box justifyContent="space-between">
-							<Text wrap="truncate">
-								<Text color="magenta" bold>{`${icon} ${shown.branch}`}</Text>
-								{symbols && <Text color="red" bold>{` [${symbols}]`}</Text>}
-							</Text>
-							{fileCount > 0 && <Text dimColor>{` ${fileCount} file${fileCount === 1 ? '' : 's'}`}</Text>}
-						</Box>
-						<Box flexDirection="column" marginTop={1}>
+						{!isShowingSession && (
+							<Box justifyContent="space-between">
+								{branchLine}
+								{fileCount > 0 && <Text dimColor>{` ${filesLabel}`}</Text>}
+							</Box>
+						)}
+						<Box flexDirection="column" marginTop={isShowingSession ? 0 : 1}>
 							{commandView ? (
 								<Box flexDirection="column">
 									<elements.Button
@@ -789,6 +858,7 @@ export const register: Register = (on, options) => {
 						</Box>
 					</Box>,
 					footer,
+					isShowingSession && fileCount > 0 ? filesLabel : '',
 				)}
 				{log}
 			</Box>,

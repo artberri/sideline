@@ -20,7 +20,9 @@ here (or move it into the plan) once it is planned.
   could show a short label the way Bash rows show their description. _From: the hide-bash-commands plan._
 - **`tsc` fails on the first `$.tool.call` it checks.** Any test file that sorts before `tests/pane.test.ts` makes
   `tsc -p .` hit TS2589 at its first `$.tool.call`, even an empty file; typing the call's argument doesn't help. New
-  test suites go in a file that sorts after it, until the cause is found. _From: the hide-bash-commands plan._
+  test suites go in a file that sorts after it, until the cause is found. A new module under `hooks/` can trigger it
+  too, by its name alone: `hooks/session.ts` and `hooks/usage.ts` did (with nothing importing them), `hooks/model.ts`
+  and `hooks/meter.ts` didn't. _From: the hide-bash-commands and session-box plans._
 - **`WAITING` for permission prompts.** The title can't tell when a permission dialog is open: `tool.check` returns
   `ask` before any dialog (and in auto mode for calls the classifier decides), the prompt opens after the check
   ends, and `classic.PermissionRequest` is swallowed by `cc-plugin-sec-default` before sideline. Worth another look

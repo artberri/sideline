@@ -35,6 +35,13 @@
 			"description": "hide: a long shell command Claude described shows its description instead of the command, and finished \"Ran 1 shell command\" / \"Read 2 files\" lines go; show: the conversation shows them as Claude Code draws them. ctrl+o always shows them.",
 			"default": "hide",
 			"options": ["hide", "show"]
+		},
+		"sessionBox": {
+			"type": "string",
+			"title": "Session box",
+			"description": "show: a SESSION box at the top of the pane with the branch, the model, the effort, the context used and the 5h and 7d usage; hide: no box, and the branch line is back in the CHANGES box.",
+			"default": "show",
+			"options": ["show", "hide"]
 		}
 	}
 }

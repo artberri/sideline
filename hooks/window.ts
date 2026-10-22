@@ -1,8 +1,11 @@
 import { LOG_SIZE } from './commands'
 
-// The rows the pane spends outside the changes box's content: the title, the box's border, and the branch line with
-// the blank row under it.
-const CHANGES_CHROME = 1 + 2 + 2
+// The rows the pane spends outside the changes box's content: the title and the box's border.
+const CHANGES_CHROME = 1 + 2
+// The branch line and the blank row under it, in the changes box when there is no session box.
+const BRANCH_ROWS = 2
+// The session box: its two lines and its border.
+export const SESSION_ROWS = 2 + 2
 // The hint line under the title, with the blank row above it.
 const HINT_ROWS = 2
 // The commands box: its lines and its border.
@@ -14,9 +17,11 @@ export function isOverCommands(row: number | undefined, bodyRows: number): boole
 	return row !== undefined && row >= bodyRows - COMMANDS_ROWS
 }
 
-// How many content rows the changes box shows in a pane `bodyRows` tall; never below one.
-export function changesRows(bodyRows: number, hasHints: boolean): number {
-	return Math.max(1, bodyRows - CHANGES_CHROME - (hasHints ? HINT_ROWS : 0) - COMMANDS_ROWS)
+// How many content rows the changes box shows in a pane `bodyRows` tall; never below one. The session box above it
+// takes the branch line out of it.
+export function changesRows(bodyRows: number, hasHints: boolean, hasSession: boolean): number {
+	const above = (hasHints ? HINT_ROWS : 0) + (hasSession ? SESSION_ROWS : BRANCH_ROWS)
+	return Math.max(1, bodyRows - CHANGES_CHROME - above - COMMANDS_ROWS)
 }
 
 // An offset kept inside `[0, lines - rows]`, so the window never runs past either end.
