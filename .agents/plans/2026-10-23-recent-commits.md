@@ -12,11 +12,11 @@ and `h` or `← back` steps out one level at a time.
   line each: `abc1234 subject` with the age (`2h`) on the right, cut to the width. A repo with no commits reads "no commits yet". — _proved by:_ `tests/pane.test.ts` › "with no changes the box says so and lists the recent commits under a heading", "a short pane lists only the commits that fit", "a repo with no commits reads no commits yet", "with changes no git log runs and no commits show"; `tests/git.test.ts` › "parseLog reads each commit line, and nothing from an empty log", "shortAge is the largest whole unit, now under a minute"
 - **B2.** Clicking a commit opens it in `CHANGES`: a first row `← back  abc1234 subject`, the top-right border label
   reads `abc1234` in place of the file count, and the box lists the files the commit changed as the usual tree, with
-  icons, status colours and `+N -N`. The first commit of a repo opens too. — _proved by:_
+  icons, status colours and `+N -N`. The first commit of a repo opens too. — _proved by:_ `tests/pane.test.ts` › "pressing a commit opens its files in CHANGES under a header, with its hash on the border"; `tests/git.test.ts` › "parseNameStatus reads each status and path, a rename under its new path"; the first commit: manual
 - **B3.** Clicking a file of the commit opens its diff in that commit. `h` or `← back` steps out one level: from the
-  diff to the commit's files, from the files to the list. — _proved by:_
+  diff to the commit's files, from the files to the list. — _proved by:_ `tests/pane.test.ts` › "a commit's file opens its diff from that commit; h steps back to the files, then to the list"
 - **B4.** Changes appearing while a commit is open don't pull the box away; it shows the working changes once you step
-  back out of the commit. — _proved by:_
+  back out of the commit. — _proved by:_ `tests/pane.test.ts` › "changes appearing while a commit is open leave the commit on screen"
 - **B5.** `j`/`k` move through the commit list and `l` opens the selected commit; the selection stays in the box's
   window. — _proved by:_
 
@@ -87,27 +87,27 @@ Git (checked when the phase is built, against a real repo, not only canned outpu
 - [x] Draw the list under "no changes": hash dim, subject, age dim, cut to the inner width; as many as fit.
 - [x] Run `bun run format` and `bun run check`.
 
-## Phase 2: Open a commit's files and their diffs in the changes box
+## Phase 2: Open a commit's files and their diffs in the changes box ✅
 
 **Description:** Clicking a commit shows its files as the tree, a file opens its diff in that commit, and `h` or
 `← back` steps back out.
 
 **Test Checklist:**
 
-- [ ] Unit test (B2): the `diff-tree` numstat and name-status read into `ChangedFile`s.
-- [ ] Pane test (B2): pressing a commit draws the header row, the `abc1234` border label and the commit's files.
-- [ ] Pane test (B3): a file press opens its diff from `git show`; `h` closes it; `h` again goes back to the list.
-- [ ] Pane test (B4): files appearing in the working tree while a commit is open leave the commit on screen.
-- [ ] Manual, live session (B2, B3): a real repo's commits, a merge and the first commit.
+- [x] Unit test (B2): the `diff-tree` numstat and name-status read into `ChangedFile`s.
+- [x] Pane test (B2): pressing a commit draws the header row, the `abc1234` border label and the commit's files.
+- [x] Pane test (B3): a file press opens its diff from `git show`; `h` closes it; `h` again goes back to the list.
+- [x] Pane test (B4): files appearing in the working tree while a commit is open leave the commit on screen.
+- [x] Manual, live session (B2, B3): a real repo's commits, a merge and the first commit.
 
 **To-do:**
 
-- [ ] Add `viewing` to the state contract and an atom; set it on a commit press (reading `diff-tree`), clear it on back.
-- [ ] Add `readCommitFiles($, root, sha)` and `readCommitDiff($, root, sha, path)` to `hooks/git.ts`.
-- [ ] While `viewing` is set, build the tree from its files, read the open file's diff from the commit, and draw the
+- [x] Add `viewing` to the state contract and an atom; set it on a commit press (reading `diff-tree`), clear it on back.
+- [x] Add `readCommitFiles($, root, sha)` and `readCommitDiff($, root, sha, path)` to `hooks/git.ts`.
+- [x] While `viewing` is set, build the tree from its files, read the open file's diff from the commit, and draw the
       header row and the border label.
-- [ ] Teach `navigate`'s back key the order: diff, then commit, then nothing.
-- [ ] Run `bun run format` and `bun run check`.
+- [x] Teach `navigate`'s back key the order: diff, then commit, then nothing.
+- [x] Run `bun run format` and `bun run check`.
 
 ## Phase 3: Move through the commit list with j/k
 
@@ -124,5 +124,4 @@ Git (checked when the phase is built, against a real repo, not only canned outpu
 
 ## Next step
 
-Phase 2: make each commit a button that opens its files (`git diff-tree`) as the tree, a file's diff from `git show`,
-and `h` / `← back` stepping out one level at a time.
+Phase 3: a cursor on the commit list, with `j`/`k` moving it and `l` opening the selected commit.

@@ -21,6 +21,9 @@ export type ChangedFile = LineCounts & { path: string; status: FileStatus; isUnt
 // A recent commit, listed while nothing is changed: its short hash, subject, and commit time in ms.
 export type Commit = { sha: string; subject: string; time: number }
 
+// A commit opened in the changes box: the files it changed, shown as the tree in place of the working changes.
+export type CommitView = { sha: string; subject: string; files: ChangedFile[] }
+
 export type Snapshot =
 	| { kind: 'loading' }
 	| { kind: 'none' }
@@ -76,6 +79,7 @@ declare module 'claude-code' {
 			openCommand: string | null
 			changesOffset: number
 			focusedCommand: string | null
+			viewing: CommitView | null
 			session: SessionInfo
 			turn: TurnState
 		}

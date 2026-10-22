@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { shortAge } from '../hooks/commits'
-import { parseLog, parseNumstat, parseStatus } from '../hooks/git'
+import { parseLog, parseNameStatus, parseNumstat, parseStatus } from '../hooks/git'
 import { lighten, rowDotFor, statusSymbols } from '../hooks/symbols'
 
 const NUL = '\0'
@@ -118,9 +118,12 @@ test('rowDotFor matches Claude Code: ⏺ on macOS, ● elsewhere', () => {
 	expect(rowDotFor('')).toBe('●')
 })
 
+const logLine = (fields: string[]) => `${fields.join(NUL)}${NUL}`
+
 test('parseLog reads each commit line, and nothing from an empty log', () => {
-	const line = (fields: string[]) => `${fields.join(NUL)}${NUL}`
-	const log = [line(['abc1234', 'feat: x', '1800000000']), line(['def5678', 'fix: y · z', '1799990000'])].join('\n')
+	const log = [logLine(['abc1234', 'feat: x', '1800000000']), logLine(['def5678', 'fix: y · z', '1799990000'])].join(
+		'\n',
+	)
 	expect(parseLog(`${log}\n`)).toEqual([
 		{ sha: 'abc1234', subject: 'feat: x', time: 1_800_000_000_000 },
 		{ sha: 'def5678', subject: 'fix: y · z', time: 1_799_990_000_000 },
@@ -135,4 +138,14 @@ test('shortAge is the largest whole unit, now under a minute', () => {
 	expect(shortAge(now, now - 2 * 3_600_000)).toBe('2h')
 	expect(shortAge(now, now - 3 * 86_400_000)).toBe('3d')
 	expect(shortAge(now, now - 400 * 86_400_000)).toBe('1y')
+})
+
+test('parseNameStatus reads each status and path, a rename under its new path', () => {
+	const stdout = ['M', 'a.ts', 'A', 'b.ts', 'D', 'c.ts', 'R100', 'old.ts', 'new.ts', ''].join(NUL)
+	expect([...parseNameStatus(stdout)]).toEqual([
+		['a.ts', 'modified'],
+		['b.ts', 'added'],
+		['c.ts', 'deleted'],
+		['new.ts', 'renamed'],
+	])
 })

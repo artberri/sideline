@@ -16,6 +16,10 @@ type World = {
 	surfaces?: ('terminal' | 'desktop' | 'vscode' | 'mobile')[]
 	log?: string
 	logExit?: number
+	// A commit's files, as `git diff-tree --numstat -z` and `--name-status -z` print them, and its diffs by path.
+	commitNumstat?: string
+	commitNames?: string
+	commitDiffs?: Record<string, string>
 }
 
 const PANE = {
@@ -64,6 +68,9 @@ function world(on: On, w: World, opens: string[]) {
 		if (argv.includes('--show-toplevel')) return done(0, '/repo\n')
 		w.ran?.push(argv)
 		if (argv.includes('log')) return done(w.logExit ?? 0, w.log ?? '')
+		if (argv.includes('diff-tree'))
+			return done(0, argv.includes('--numstat') ? (w.commitNumstat ?? '') : (w.commitNames ?? ''))
+		if (argv.includes('show')) return done(0, w.commitDiffs?.[argv.at(-1) ?? ''] ?? '')
 		if (argv.includes('diff') && !argv.includes('--numstat')) return done(0, w.diffs?.[argv.at(-1) ?? ''] ?? '')
 		if (argv.includes('--no-index')) return done(1, w.untracked?.[argv.at(-1) ?? ''] ?? '')
 		if (argv.includes('diff')) return done(0, w.numstat ?? '')
@@ -1166,4 +1173,62 @@ test('with changes no git log runs and no commits show', async ($, on) => {
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	expect(ran.some((argv) => argv.includes('log'))).toBe(false)
 	expect(await drawn($, 'terminal')).not.toContain('abc1234')
+})
+
+const COMMIT_WORLD = {
+	commitNumstat: ['3\t1\tsrc/tree.ts', '12\t0\tsrc/new.ts', ''].join('\0'),
+	commitNames: ['M', 'src/tree.ts', 'A', 'src/new.ts', ''].join('\0'),
+	commitDiffs: { 'src/tree.ts': 'diff --git a/src/tree.ts b/src/tree.ts\n@@ -1 +1 @@\n-old\n+new\n' },
+}
+
+test('pressing a commit opens its files in CHANGES under a header, with its hash on the border', async ($, on) => {
+	const clock = world(on, { status: CLEAN, log: LOG, ...COMMIT_WORLD }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	await ui.press({ key: 'commit-abc1234' })
+	await clock.settle()
+	const box = JSON.stringify(await ui.find({ key: 'changes' }))
+	expect(box).toContain('← back')
+	expect(box).toContain('feat: draw the tree')
+	expect(box).toContain(' abc1234 ')
+	expect(box).toContain('"name":"tree.ts"')
+	expect(box).toContain('"name":"new.ts"')
+	expect(box).not.toContain('Recent commits')
+	await ui.unmount()
+})
+
+test("a commit's file opens its diff from that commit; h steps back to the files, then to the list", async ($, on) => {
+	const ran: string[][] = []
+	const clock = world(on, { status: CLEAN, log: LOG, ran, ...COMMIT_WORLD }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	await ui.press({ key: 'commit-abc1234' })
+	await ui.post({ press: 'src/tree.ts', kind: 'file' }, { in: 'rows' })
+	await clock.settle()
+	const code = await ui.find({ type: 'Code', in: 'rows' })
+	expect(code?.props.source).toBe('@@ -1 +1 @@\n-old\n+new\n')
+	expect(ran.some((argv) => argv.includes('show') && argv.includes('abc1234'))).toBe(true)
+	await ui.press({ key: 'nav-h' })
+	await clock.settle()
+	expect(await ui.find({ type: 'Code', in: 'rows' })).toBeUndefined()
+	expect(JSON.stringify(await ui.find({ key: 'changes' }))).toContain('← back')
+	await ui.press({ key: 'nav-h' })
+	await clock.settle()
+	expect(JSON.stringify(await ui.find({ key: 'changes' }))).toContain('Recent commits')
+	await ui.unmount()
+})
+
+test('changes appearing while a commit is open leave the commit on screen', async ($, on) => {
+	const w: World = { status: CLEAN, log: LOG, ...COMMIT_WORLD }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	await ui.press({ key: 'commit-abc1234' })
+	w.status = STATUS
+	await clock.advance(2_100)
+	const box = JSON.stringify(await ui.find({ key: 'changes' }))
+	expect(box).toContain('← back')
+	expect(box).toContain('"name":"new.ts"')
+	expect(box).not.toContain('"name":"staged.ts"')
+	await ui.unmount()
 })

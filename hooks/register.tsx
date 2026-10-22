@@ -4,6 +4,8 @@ import type { ClientElements, Color, EngineInterface, Register } from 'claude-co
 import type {
 	ActiveEdit,
 	ChangedFile,
+	Commit,
+	CommitView,
 	Cursor,
 	FileDiff,
 	FileStatus,
@@ -13,7 +15,7 @@ import type {
 	TurnState,
 } from '../types'
 import { LOG_SIZE, commandStep, hiddenCommandInput, logLine, runningDescription } from './commands'
-import { readDiff, readSnapshot } from './git'
+import { readCommitDiff, readCommitFiles, readDiff, readSnapshot } from './git'
 import { USAGE_LABEL, USAGE_SEPARATOR, bar, barWidth, level, modelName, percentLabel, readings } from './meter'
 import { rowIcon } from './icons'
 import { cutDiff, drawDiff, drawRows } from './rows'
@@ -88,6 +90,8 @@ const session = atom(
 		sevenDay: null,
 	} as SessionInfo,
 )
+// The commit opened in the changes box from the recent commits list, or null for the working changes.
+const viewing = atom({ plugin: 'sideline', key: 'viewing' } as const, null as CommitView | null)
 const focusedCommand = atom({ plugin: 'sideline', key: 'focusedCommand' } as const, null as string | null)
 const turn = atom({ plugin: 'sideline', key: 'turn' } as const, 'idle' as TurnState)
 
@@ -125,12 +129,15 @@ async function closeDiff($: EngineInterface): Promise<void> {
 async function readSelectedDiff($: EngineInterface, shown: Snapshot): Promise<void> {
 	const path = await read($, selected)
 	if (path === null) return
-	const file = shown.kind === 'repo' ? shown.files.find((one) => one.path === path) : undefined
+	const commit = await read($, viewing)
+	const files = commit?.files ?? (shown.kind === 'repo' ? shown.files : [])
+	const file = files.find((one) => one.path === path)
 	if (!file || shown.kind !== 'repo') {
 		await closeDiff($)
 		return
 	}
-	const next: FileDiff = { path, hunks: await readDiff($, shown.root, file) }
+	const hunks = commit ? await readCommitDiff($, shown.root, commit.sha, path) : await readDiff($, shown.root, file)
+	const next: FileDiff = { path, hunks }
 	const current = await read($, diff)
 	if (JSON.stringify(current) !== JSON.stringify(next)) await update($, diff, () => next)
 }
@@ -179,6 +186,9 @@ function withEditedFiles(files: ChangedFile[], edited: Map<string, ActiveEdit>):
 async function currentTree($: EngineInterface): Promise<{ rows: TreeRow[]; edited: Map<string, ActiveEdit> } | null> {
 	const shown = await read($, snapshot)
 	if (shown.kind !== 'repo') return null
+	// An opened commit shows its own files, with nothing being edited in them.
+	const commit = await read($, viewing)
+	if (commit) return { rows: treeRows(commit.files), edited: new Map() }
 	const root = `${shown.root}/`
 	const edited = new Map(
 		(await read($, edits))
@@ -245,6 +255,23 @@ async function navigateCommands($: EngineInterface, id: string, key: string): Pr
 	}
 }
 
+// Opens a recent commit in the changes box: its files become the tree, from the top, with nothing selected.
+async function openCommit($: EngineInterface, commit: Commit): Promise<void> {
+	const shown = await read($, snapshot)
+	if (shown.kind !== 'repo') return
+	const files = await readCommitFiles($, shown.root, commit.sha)
+	await closeDiff($)
+	await update($, cursor, () => null)
+	await update($, viewing, () => ({ sha: commit.sha, subject: commit.subject, files }))
+}
+
+// Back from an opened commit to the working changes (and the list, while there are none).
+async function closeCommit($: EngineInterface): Promise<void> {
+	await closeDiff($)
+	await update($, cursor, () => null)
+	await update($, viewing, () => null)
+}
+
 async function navigate($: EngineInterface, key: string): Promise<void> {
 	const focused = await read($, focusedCommand)
 	// c toggles: into the commands box on the newest command, and from there back to the changes box, as h does.
@@ -268,6 +295,11 @@ async function navigate($: EngineInterface, key: string): Promise<void> {
 	const open = await read($, selected)
 	if (open !== null && BACK.has(key)) {
 		await closeDiff($)
+		return
+	}
+	// Back steps out one level at a time: a file's diff above, then the opened commit.
+	if (BACK.has(key) && (await read($, viewing)) !== null) {
+		await closeCommit($)
 		return
 	}
 	const tree = await currentTree($)
@@ -724,7 +756,8 @@ export const register: Register = (on, options) => {
 			deleted: row.deleted,
 			isBinary: row.isBinary,
 		}))
-		const hints = (rows.length > 0 || diffView || commandView || logged.length > 0) && (
+		const commit = await read($, viewing)
+		const hints = (rows.length > 0 || diffView || commandView || logged.length > 0 || commit) && (
 			<Box flexDirection="column" alignItems="center" marginTop={1}>
 				<Box flexDirection="row">
 					{commandView ? (
@@ -769,6 +802,17 @@ export const register: Register = (on, options) => {
 						</Box>
 					) : (
 						<Box flexDirection="row">
+							{commit && (
+								<elements.Button
+									key="nav-h"
+									plain
+									dimColor
+									hotkey="h"
+									label="back"
+									onPress={() => navigate($, 'h')}
+								/>
+							)}
+							{commit && <Text> </Text>}
 							<elements.Button
 								key="nav-j"
 								plain
@@ -824,7 +868,9 @@ export const register: Register = (on, options) => {
 		const commandRows = commandView ? wrapLines(commandView.command, innerColumns) : []
 		const diffLines = diffView && diffView.hunks !== '' ? diffView.hunks.replace(/\n$/, '').split('\n') : []
 		// A diff or a command keeps its header row and the blank row under it above the window.
-		const shownRows = commandView || diffView ? Math.max(1, windowRows - 2) : windowRows
+		// An opened commit keeps its header row above everything else in the box.
+		const contentRows = commit ? Math.max(1, windowRows - 1) : windowRows
+		const shownRows = commandView || diffView ? Math.max(1, contentRows - 2) : contentRows
 		const lineCount = commandView ? commandRows.length : diffView ? diffLines.length : rows.length
 		changesWindow = { lines: lineCount, rows: shownRows }
 		const offset = clampOffset(await read($, changesOffset), lineCount, shownRows)
@@ -848,7 +894,21 @@ export const register: Register = (on, options) => {
 								{fileCount > 0 && <Text dimColor>{` ${filesLabel}`}</Text>}
 							</Box>
 						)}
-						<Box flexDirection="column" marginTop={isShowingSession ? 0 : 1}>
+						{commit && (
+							<Box flexDirection="row" marginTop={isShowingSession ? 0 : 1}>
+								<elements.Button
+									key="commit-back"
+									plain
+									label="← back"
+									onPress={() => void closeCommit($)}
+								/>
+								<Text wrap="truncate-end">
+									<Text dimColor>{`  ${commit.sha} `}</Text>
+									<Text bold>{commit.subject}</Text>
+								</Text>
+							</Box>
+						)}
+						<Box flexDirection="column" marginTop={isShowingSession || commit ? 0 : 1}>
 							{commandView ? (
 								<Box flexDirection="column">
 									<elements.Button
@@ -863,6 +923,8 @@ export const register: Register = (on, options) => {
 										))}
 									</Box>
 								</Box>
+							) : commit && rows.length === 0 && !diffView ? (
+								<Text dimColor>no files changed</Text>
 							) : rows.length === 0 && !diffView ? (
 								<Box flexDirection="column">
 									<Text dimColor>No uncommitted changes</Text>
@@ -870,13 +932,18 @@ export const register: Register = (on, options) => {
 										<Text bold>Recent commits</Text>
 										{shown.commits.length === 0 && <Text dimColor>no commits yet</Text>}
 										{/* Under the status line, a blank row and the heading. */}
-										{shown.commits.slice(0, Math.max(0, shownRows - 3)).map((commit) => (
-											<Box key={`commit-${commit.sha}`} justifyContent="space-between">
-												<Text wrap="truncate-end">
-													<Text dimColor>{`${commit.sha} `}</Text>
-													{commit.subject}
-												</Text>
-												<Text dimColor>{` ${shortAge(now, commit.time)}`}</Text>
+										{shown.commits.slice(0, Math.max(0, shownRows - 3)).map((recent) => (
+											<Box key={`commit-line-${recent.sha}`} justifyContent="space-between">
+												<elements.Button
+													key={`commit-${recent.sha}`}
+													plain
+													label={recent.subject}
+													onPress={() => void openCommit($, recent)}
+												>
+													<Text dimColor>{`${recent.sha} `}</Text>
+													{recent.subject}
+												</elements.Button>
+												<Text dimColor>{` ${shortAge(now, recent.time)}`}</Text>
 											</Box>
 										))}
 									</Box>
@@ -901,7 +968,7 @@ export const register: Register = (on, options) => {
 						</Box>
 					</Box>,
 					footer,
-					isShowingSession && fileCount > 0 ? filesLabel : '',
+					commit ? commit.sha : isShowingSession && fileCount > 0 ? filesLabel : '',
 				)}
 				{log}
 			</Box>,

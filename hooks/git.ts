@@ -151,6 +151,45 @@ export function parseLog(stdout: string): Commit[] {
 	})
 }
 
+// `--name-status -z`: a status letter (`M`, `A`, `D`, `R100`, ...) and its path, NUL-separated; a rename or copy has two
+// paths, the old then the new.
+export function parseNameStatus(stdout: string): Map<string, FileStatus> {
+	const statuses = new Map<string, FileStatus>()
+	const fields = stdout.split('\0')
+	for (let i = 0; i < fields.length - 1;) {
+		const code = fields[i] ?? ''
+		const isMove = code.startsWith('R') || code.startsWith('C')
+		const path = fields[i + (isMove ? 2 : 1)]
+		if (path) statuses.set(path, NAME_STATUS[code.charAt(0)] ?? 'modified')
+		i += isMove ? 3 : 2
+	}
+	return statuses
+}
+
+const NAME_STATUS: Record<string, FileStatus> = { A: 'added', D: 'deleted', R: 'renamed', C: 'added', U: 'conflicted' }
+
+// What a commit changed, against its first parent (`-m --first-parent` for a merge; `--root` for the first commit).
+const COMMIT_DIFF = ['-r', '--root', '--no-commit-id', '-m', '--first-parent']
+
+// The files a commit changed, with their status and line counts, as the tree draws them.
+export async function readCommitFiles($: EngineInterface, root: string, sha: string): Promise<ChangedFile[]> {
+	const counts = parseNumstat((await git($, root, ['diff-tree', ...COMMIT_DIFF, '--numstat', '-z', sha])).stdout)
+	const statuses = parseNameStatus(
+		(await git($, root, ['diff-tree', ...COMMIT_DIFF, '--name-status', '-z', sha])).stdout,
+	)
+	return [...statuses].map(([path, status]) => ({
+		path,
+		status,
+		isUntracked: false,
+		...(counts.get(path) ?? { added: 0, deleted: 0, isBinary: false }),
+	}))
+}
+
+// One file's diff in a commit, against its first parent.
+export async function readCommitDiff($: EngineInterface, root: string, sha: string, path: string): Promise<string> {
+	return hunksOnly((await git($, root, ['show', '--format=', '-m', '--first-parent', sha, '--', path])).stdout)
+}
+
 export async function readSnapshot($: EngineInterface, cwd: string): Promise<Snapshot> {
 	const run = await git($, cwd, ['status', '--porcelain=v2', '--branch', '-z', '--untracked-files=all'])
 	if (run.exitCode !== 0) return { kind: 'none' }
