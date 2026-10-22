@@ -1,6 +1,14 @@
 import { expect, test } from 'claude-code/testing'
 
-import { changesRows, clampOffset, hiddenAround, hiddenLabel, isOverCommands, wrapLines } from '../hooks/window'
+import {
+	changesRows,
+	clampOffset,
+	hiddenAround,
+	hiddenLabel,
+	isOverCommands,
+	revealOffset,
+	wrapLines,
+} from '../hooks/window'
 
 test('changesRows leaves the title, hints, borders, branch line and commands box out', () => {
 	// 40 rows: title 1, hints 3, the box's border 2, branch line and blank 2, commands 7.
@@ -31,4 +39,10 @@ test('isOverCommands is true on the last seven rows, false above and for a key',
 
 test('wrapLines puts $ before the first line and wraps each line at the width', () => {
 	expect(wrapLines('echo hi\n\n' + 'x'.repeat(12), 5)).toEqual(['$ ech', 'o hi', ' ', 'xxxxx', 'xxxxx', 'xx'])
+})
+
+test('revealOffset moves the window just enough to show the line', () => {
+	expect(revealOffset(0, 3, 5)).toBe(0)
+	expect(revealOffset(0, 5, 5)).toBe(1)
+	expect(revealOffset(4, 2, 5)).toBe(2)
 })

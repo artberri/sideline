@@ -18,7 +18,7 @@ command, which now opens there instead of unfolding in the log.
 - **B5.** While `CHANGES` has lines above or below its window, its bottom-right border reads `↑ 4 ↓ 12` (only the
   sides that apply); nothing shows when it all fits. — _proved by:_ `tests/pane.test.ts` › "a short pane shows a window of the tree and counts the rest on the border"; `tests/window.test.ts` › "hiddenLabel counts the lines above and below, only the sides that have some"
 - **B6.** `j`/`k` keep the selected row in view, the arrow and page keys scroll `CHANGES`, and opening a diff or a
-  command starts at its top. — _proved by:_
+  command starts at its top. — _proved by:_ `tests/pane.test.ts` › "j past the window moves it down by one, and k above it moves it back up", "a scroll key (no pointer) scrolls CHANGES"; `tests/window.test.ts` › "revealOffset moves the window just enough to show the line"
 - **B7.** The hint line under the title stays one row on a narrow pane (cut, not wrapped), so the boxes' rows add
   up. — _proved by:_ `tests/pane.test.ts` › "the focus hint is cut to one row, never wrapped"
 
@@ -115,26 +115,25 @@ how much is above and below.
 - [x] Lay `↑ N ↓ M` over the bottom-right border of `CHANGES`.
 - [x] Run `bun run format` and `bun run check`.
 
-## Phase 3: Keep the cursor in view and scroll changes with the keys
+## Phase 3: Keep the cursor in view and scroll changes with the keys ✅
 
 **Description:** Moving the selection with `j`/`k` keeps it inside the window, and the arrow and page keys scroll
 `CHANGES` when the pane is focused.
 
 **Test Checklist:**
 
-- [ ] Pane test (B6): `j` past the window's last row moves the window by one; `k` above its first does the same up.
-- [ ] Pane test (B6): a `ui.scroll` without `pointer` (a key) scrolls `CHANGES`.
-- [ ] Manual, live session (B6): page keys and arrows while the pane is focused.
+- [x] Pane test (B6): `j` past the window's last row moves the window by one; `k` above its first does the same up.
+- [x] Pane test (B6): a `ui.scroll` without `pointer` (a key) scrolls `CHANGES`.
+- [x] Manual, live session (B6): page keys and arrows while the pane is focused.
 
 **To-do:**
 
-- [ ] In `select`, replace `$.ui.scroll({ to: { key: id }, in: PANE })` with moving `changesOffset` so the row is in
+- [x] In `select`, replace `$.ui.scroll({ to: { key: id }, in: PANE })` with moving `changesOffset` so the row is in
       the window.
 - [x] Send `ui.scroll` events without `pointer` to `CHANGES` (done in Phase 2: a scroll with no pointer isn't over `COMMANDS`).
-- [ ] Remove "Check the selection scrolls into view" from `.agents/follow-ups.md`.
-- [ ] Run `bun run format` and `bun run check`.
+- [x] Remove "Check the selection scrolls into view" from `.agents/follow-ups.md`.
+- [x] Run `bun run format` and `bun run check`.
 
 ## Next step
 
-Phase 3: make `select` move `changesOffset` so the `j`/`k` cursor stays in the window, in place of
-`$.ui.scroll({ to: { key: id }, in: PANE })`.
+Done: all three phases are in.

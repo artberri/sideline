@@ -27,7 +27,7 @@ import {
 	statusSymbols,
 } from './symbols'
 import { resolveCursor, treeRows } from './tree'
-import { changesRows, clampOffset, hiddenAround, hiddenLabel, isOverCommands, wrapLines } from './window'
+import { changesRows, clampOffset, hiddenAround, hiddenLabel, isOverCommands, revealOffset, wrapLines } from './window'
 import type { TreeRow } from './tree'
 
 const PANE = 'sideline'
@@ -183,7 +183,9 @@ async function toggleCommand($: EngineInterface, id: string): Promise<void> {
 
 async function select($: EngineInterface, id: string, index: number): Promise<void> {
 	await update($, cursor, () => ({ id, index }))
-	await $.ui.scroll({ to: { key: id }, in: PANE }).catch(() => undefined)
+	// The pane never scrolls; the changes box's own window follows the selection.
+	const { lines, rows } = changesWindow
+	await update($, changesOffset, (offset) => revealOffset(clampOffset(offset, lines, rows), index, rows))
 }
 
 // In a diff, j/k open the next or previous changed file's diff, and the selection follows it.

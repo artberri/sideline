@@ -24,6 +24,14 @@ export function clampOffset(offset: number, lines: number, rows: number): number
 	return Math.min(Math.max(0, offset), Math.max(0, lines - rows))
 }
 
+// The offset that brings line `index` into a window of `rows`: unchanged when it already shows, else just enough to
+// put it at the window's nearer edge.
+export function revealOffset(offset: number, index: number, rows: number): number {
+	if (index < offset) return index
+	if (index >= offset + rows) return index - rows + 1
+	return offset
+}
+
 // The lines a window of `rows` at `offset` hides above and below.
 export function hiddenAround(offset: number, lines: number, rows: number): { above: number; below: number } {
 	const at = clampOffset(offset, lines, rows)

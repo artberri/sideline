@@ -503,10 +503,10 @@ test('a legend of hotkey buttons explains the keys while there are changes', asy
 	const clock = world(on, w, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	const ui = await mountPane($)
+	const keys = async () => (await ui.findAll({ type: 'Button' })).map((button) => button.props.hotkey).filter(Boolean)
 	expect((await ui.find({ type: 'Text', text: /esc prompt/ }))?.text).toBe(
 		'click or ctrl+x tab to focus · esc prompt',
 	)
-	const keys = async () => (await ui.findAll({ type: 'Button' })).map((button) => button.props.hotkey).filter(Boolean)
 	expect(await keys()).toEqual(['j', 'k', 'l'])
 	await ui.post({ press: 'modified.ts', kind: 'file' }, { in: 'rows' })
 	expect(await keys()).toEqual(['h', 'j', 'k'])
@@ -910,4 +910,33 @@ test('the focus hint is cut to one row, never wrapped', async ($, on) => {
 	const hint = await ui.find({ type: 'Text', text: /ctrl\+x tab/ })
 	await ui.unmount()
 	expect(hint?.props.wrap).toBe('truncate-end')
+})
+
+test('j past the window moves it down by one, and k above it moves it back up', async ($, on) => {
+	world(on, { status: MANY }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await $.ui.mount({
+		...PANE,
+		surface: 'terminal',
+		props: { ...PANE.props, scroll: { offset: 0, bodyRows: 20 } },
+	})
+	const box = async () => JSON.stringify(await ui.find({ key: 'changes' }))
+	// The window shows five rows, file00 to file04; the first j selects file00, four more reach file04.
+	for (let n = 0; n < 5; n++) await ui.key({ key: 'j', in: 'rows' })
+	expect(await box()).toContain('file00.ts')
+	await ui.key({ key: 'j', in: 'rows' })
+	const down = await box()
+	expect(down).not.toContain('file00.ts')
+	expect(down).toContain('file05.ts')
+	for (let n = 0; n < 5; n++) await ui.key({ key: 'k', in: 'rows' })
+	expect(await box()).toContain('file00.ts')
+	await ui.unmount()
+})
+
+test('a scroll key (no pointer) scrolls CHANGES', async ($, on) => {
+	world(on, { status: MANY }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	await shortPane($)
+	await $.ui.scroll(wheel(2))
+	expect(await shortPane($)).toContain(' ↑ 2 ↓ 5 ')
 })

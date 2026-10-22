@@ -8,9 +8,6 @@ here (or move it into the plan) once it is planned.
 - **Cache untracked line counts.** The 2-second poll runs one `git diff --no-index` per untracked file (up to 60);
   caching the counts by file modification time would keep it light in a repo with many new files. _From: the
   changed-files pane plan._
-- **Check the selection scrolls into view.** `$.ui.scroll({ to: { key } })` is called on each move, but nobody has seen
-  the selected row scroll into view in a tree longer than the pane, and it may not reach rows inside a `Client`.
-  _From: the keyboard-navigation plan._
 - **Clicks and keys on mobile and VS Code.** Those surfaces have no `Client`, so the tree can't be clicked or driven by
   keys there; it draws, but without interaction. _From: the transcript-diffs and keyboard-navigation plans._
 - **Write a `README.md`.** `claude plugin validate` reports a missing README as the one problem left for submitting
