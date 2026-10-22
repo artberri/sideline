@@ -12,6 +12,18 @@ here (or move it into the plan) once it is planned.
   _From: the validator's output since the scaffold, and the Nerd Font icon review._
 - **Fold other tools' long inputs.** Agent prompts and MCP calls can print long inputs in the transcript too; they
   could show a short label the way Bash rows show their description. _From: the hide-bash-commands plan._
+    - **Measure first (in progress).** Branch `probe/tool-input-lengths` (pushed) has a temporary probe: each finished
+      standalone tool row logs its tool name, parameter names and input length, never values, to `.probe.log` in the
+      mod's folder (gitignored there). To run it: `git switch probe/tool-input-lengths`, work as usual for a session or
+      two with some MCP calls (Notion, Slack, Jira) and subagents, then read `.probe.log`: one line per tool with rows
+      seen, how many were over 120 characters, the longest and the parameter names. Grouped calls draw no row of their
+      own, so they don't show; the long ones expected (MCP, `Agent`) are standalone.
+    - **Then the fix**, for the tools the log shows long: a `ToolUse` hook rewrites `input` for the row only (the call is
+      untouched), keeping every parameter name, cutting string values to about 40 characters with `…` and nested values
+      to `{…}` / `[…]`; no LLM summaries; ctrl+o and `transcriptCommands: show` keep it whole. Probably one phase if it
+      is mostly MCP. Trade-off: a cut MCP row can hide the detail you'd check before a write (a channel, a JQL clause);
+      the permission dialog still shows it whole.
+    - **Afterwards** delete the branch (`git push origin --delete probe/tool-input-lengths`); the probe is never merged.
 - **`tsc` fails on the first `$.tool.call` it checks.** Any test file that sorts before `tests/pane.test.ts` makes
   `tsc -p .` hit TS2589 at its first `$.tool.call`, even an empty file; typing the call's argument doesn't help. New
   test suites go in a file that sorts after it, until the cause is found. A new module under `hooks/` can trigger it
