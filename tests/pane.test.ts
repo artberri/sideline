@@ -64,6 +64,8 @@ function world(on: On, w: World, opens: string[]) {
 		return done(0)
 	})
 	on('tool.call', () => (w.tool?.() ?? { result: {} }) as { result: Record<string, never> })
+	on('turn.start', (_, e) => ({ turnId: e.turnId }))
+	on('turn.complete', () => ({ text: '' }))
 	return clock
 }
 
@@ -602,3 +604,55 @@ test(
 		expect(await drawn($, 'terminal')).not.toContain('sleep 8')
 	},
 )
+
+const TURN = { turnId: 't1', text: 'go' }
+const ENDED = { turnId: 't1', answer: '', durationMs: 1, isAborted: false, reason: 'answer' } as const
+
+test('the title reads SIDELINE · IDLE, and WORKING while a main turn runs', async ($, on) => {
+	world(on, { status: STATUS }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	expect(await drawn($, 'terminal')).toContain('SIDELINE')
+	expect(await drawn($, 'terminal')).toContain('IDLE')
+	await $.turn.start(TURN)
+	expect(await drawn($, 'terminal')).toContain('WORKING')
+	await $.turn.complete(ENDED)
+	const text = await drawn($, 'terminal')
+	expect(text).toContain('IDLE')
+	expect(text).not.toContain('WORKING')
+})
+
+test("a subagent's turn ending leaves the title WORKING", async ($, on) => {
+	world(on, { status: STATUS }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	await $.turn.start(TURN)
+	await $.turn.start({ ...TURN, turnId: 't2', agentId: 'a1' })
+	await $.turn.complete({ ...ENDED, turnId: 't2', agentId: 'a1' })
+	expect(await drawn($, 'terminal')).toContain('WORKING')
+})
+
+test('the hints sit under the title, above the tree, and only with changes', async ($, on) => {
+	world(on, { status: STATUS }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	const text = JSON.stringify(await ui.drawn())
+	await ui.unmount()
+	const hint = text.indexOf('ctrl+x tab')
+	expect(text.indexOf('IDLE')).toBeLessThan(hint)
+	expect(hint).toBeLessThan(text.indexOf('main'))
+})
+
+test('with no changes the pane shows no hints', async ($, on) => {
+	world(on, { status: ['# branch.oid 0123456789abcdef', '# branch.head main', ''].join('\0') }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const text = await drawn($, 'terminal')
+	expect(text).toContain('no changes')
+	expect(text).not.toContain('ctrl+x tab')
+})
+
+test('an interrupted turn sets the title back to IDLE', async ($, on) => {
+	world(on, { status: STATUS }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	await $.turn.start(TURN)
+	await $.turn.complete({ ...ENDED, isAborted: true, reason: 'aborted' })
+	expect(await drawn($, 'terminal')).toContain('IDLE')
+})

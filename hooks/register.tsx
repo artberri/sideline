@@ -1,7 +1,16 @@
 import { atom, read, update } from 'claude-code'
 import type { Color, EngineInterface, Register } from 'claude-code'
 
-import type { ActiveEdit, ChangedFile, Cursor, FileDiff, FileStatus, RunningCommand, Snapshot } from '../types'
+import type {
+	ActiveEdit,
+	ChangedFile,
+	Cursor,
+	FileDiff,
+	FileStatus,
+	RunningCommand,
+	Snapshot,
+	TurnState,
+} from '../types'
 import { commandLines, hiddenCommandInput, runningDescription } from './commands'
 import { readDiff, readSnapshot } from './git'
 import { rowIcon } from './icons'
@@ -22,6 +31,7 @@ import type { TreeRow } from './tree'
 
 const PANE = 'sideline'
 const TITLE = 'Changes'
+const NAME = 'SIDELINE'
 const POLL_MS = 2_000
 const REFRESH_AFTER = new Set(['Edit', 'Write', 'NotebookEdit', 'Bash'])
 const FLASH_MS = 100
@@ -43,6 +53,7 @@ const selected = atom({ plugin: 'sideline', key: 'selected' } as const, null as 
 const diff = atom({ plugin: 'sideline', key: 'diff' } as const, null as FileDiff | null)
 const cursor = atom({ plugin: 'sideline', key: 'cursor' } as const, null as Cursor | null)
 const running = atom({ plugin: 'sideline', key: 'running' } as const, [] as RunningCommand[])
+const turn = atom({ plugin: 'sideline', key: 'turn' } as const, 'idle' as TurnState)
 
 const STATUS_COLOR: Record<FileStatus, Color> = {
 	added: 'success',
@@ -225,6 +236,17 @@ export const register: Register = (on, options) => {
 		return { text: 'Changes pane opened.' }
 	})
 
+	// Only the main loop's turns: a subagent's start and end (`agentId`) come and go inside them.
+	on('turn.start', async ($, e, next) => {
+		if (e.agentId === undefined) await update($, turn, () => 'working')
+		return next(e)
+	})
+
+	on('turn.complete', async ($, e, next) => {
+		if (e.agentId !== undefined) return next(e)
+		return next(e).finally(() => update($, turn, () => 'idle'))
+	})
+
 	on('tool.call', async ($, e, next) => {
 		const path = editedPath(e)
 		if (!path) {
@@ -349,8 +371,26 @@ export const register: Register = (on, options) => {
 				{body}
 			</Box>
 		)
-		if (shown.kind === 'loading') return fill(<Text> </Text>)
-		if (shown.kind === 'none') return fill(<Text dimColor>not a git repo</Text>)
+		const isWorking = (await read($, turn)) === 'working'
+		const title = (
+			<Box justifyContent="center">
+				<Text bold wrap="truncate">
+					{NAME}
+					<Text dimColor>{' · '}</Text>
+					{isWorking ? <Text color="claude">WORKING</Text> : <Text dimColor>IDLE</Text>}
+				</Text>
+			</Box>
+		)
+		if (shown.kind === 'loading') return fill(title)
+		if (shown.kind === 'none')
+			return fill(
+				<Box flexDirection="column">
+					{title}
+					<Box marginTop={1}>
+						<Text dimColor>not a git repo</Text>
+					</Box>
+				</Box>,
+			)
 		const symbols = statusSymbols(shown.status)
 		const tree = await currentTree($)
 		const edited = tree?.edited ?? new Map<string, ActiveEdit>()
@@ -376,12 +416,86 @@ export const register: Register = (on, options) => {
 			deleted: row.deleted,
 			isBinary: row.isBinary,
 		}))
+		const hints = (rows.length > 0 || diffView) && (
+			<Box flexDirection="column" alignItems="center" marginTop={1}>
+				<Box flexDirection="row">
+					{diffView ? (
+						<Box flexDirection="row">
+							<elements.Button
+								key="nav-h"
+								plain
+								dimColor
+								autoFocus
+								hotkey="h"
+								label="back"
+								onPress={() => navigate($, 'h')}
+							/>
+							<Text> </Text>
+							<elements.Button
+								key="nav-j"
+								plain
+								dimColor
+								hotkey="j"
+								label="next file"
+								onPress={() => navigate($, 'j')}
+							/>
+							<Text> </Text>
+							<elements.Button
+								key="nav-k"
+								plain
+								dimColor
+								hotkey="k"
+								label="previous file"
+								onPress={() => navigate($, 'k')}
+							/>
+						</Box>
+					) : (
+						<Box flexDirection="row">
+							<elements.Button
+								key="nav-j"
+								plain
+								dimColor
+								hotkey="j"
+								label="down"
+								onPress={() => navigate($, 'j')}
+							/>
+							<Text> </Text>
+							<elements.Button
+								key="nav-k"
+								plain
+								dimColor
+								hotkey="k"
+								label="up"
+								onPress={() => navigate($, 'k')}
+							/>
+							<Text> </Text>
+							<elements.Button
+								key="nav-l"
+								plain
+								dimColor
+								autoFocus
+								hotkey="l"
+								label="open"
+								onPress={() => navigate($, 'l')}
+							/>
+						</Box>
+					)}
+				</Box>
+				<Text dimColor wrap="wrap">
+					{FOCUS_HINT}
+				</Text>
+			</Box>
+		)
 		return fill(
 			<Box flexDirection="column" flexGrow={1}>
-				<Text>
-					<Text color="magenta" bold>{`${icon} ${shown.branch}`}</Text>
-					{symbols && <Text color="red" bold>{` [${symbols}]`}</Text>}
-				</Text>
+				{title}
+				{hints}
+				<Box marginTop={1}>
+					<Text>
+						<Text color="magenta" bold>{`${icon} ${shown.branch}`}</Text>
+						{symbols && <Text color="red" bold>{` [${symbols}]`}</Text>}
+					</Text>
+				</Box>
 				<Box flexDirection="column" marginTop={1}>
 					{rows.length === 0 && !diffView ? (
 						<Text dimColor>no changes</Text>
@@ -397,83 +511,9 @@ export const register: Register = (on, options) => {
 						drawRows({ rows, hoverBackground }, elements, 0, -1, cursorId)
 					)}
 				</Box>
-				{(rows.length > 0 || diffView) && (
-					<Box flexGrow={1} flexDirection="column" justifyContent="flex-end" marginTop={1}>
-						<Box flexDirection="row">
-							{diffView ? (
-								<Box flexDirection="row">
-									<elements.Button
-										key="nav-h"
-										plain
-										dimColor
-										autoFocus
-										hotkey="h"
-										label="back"
-										onPress={() => navigate($, 'h')}
-									/>
-									<Text> </Text>
-									<elements.Button
-										key="nav-j"
-										plain
-										dimColor
-										hotkey="j"
-										label="next file"
-										onPress={() => navigate($, 'j')}
-									/>
-									<Text> </Text>
-									<elements.Button
-										key="nav-k"
-										plain
-										dimColor
-										hotkey="k"
-										label="previous file"
-										onPress={() => navigate($, 'k')}
-									/>
-								</Box>
-							) : (
-								<Box flexDirection="row">
-									<elements.Button
-										key="nav-j"
-										plain
-										dimColor
-										hotkey="j"
-										label="down"
-										onPress={() => navigate($, 'j')}
-									/>
-									<Text> </Text>
-									<elements.Button
-										key="nav-k"
-										plain
-										dimColor
-										hotkey="k"
-										label="up"
-										onPress={() => navigate($, 'k')}
-									/>
-									<Text> </Text>
-									<elements.Button
-										key="nav-l"
-										plain
-										dimColor
-										autoFocus
-										hotkey="l"
-										label="open"
-										onPress={() => navigate($, 'l')}
-									/>
-								</Box>
-							)}
-						</Box>
-						<Text dimColor wrap="wrap">
-							{FOCUS_HINT}
-						</Text>
-					</Box>
-				)}
+				<Box flexGrow={1} />
 				{runningCommand && (
-					<Box
-						flexGrow={rows.length > 0 || diffView ? 0 : 1}
-						flexDirection="column"
-						justifyContent="flex-end"
-						marginTop={1}
-					>
+					<Box flexDirection="column" marginTop={1}>
 						{commandLines(runningCommand.command, e.props.bodyColumns - 2).map((line, index) => (
 							<Text key={`command-${index}`} dimColor>
 								{line}
