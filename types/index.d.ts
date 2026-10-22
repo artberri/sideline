@@ -58,6 +58,7 @@ declare module 'claude-code' {
 			diff: FileDiff | null
 			cursor: Cursor | null
 			commands: LoggedCommand[]
+			openCommand: string | null
 			turn: TurnState
 		}
 	}

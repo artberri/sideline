@@ -772,3 +772,31 @@ test("a subagent's question leaves the title WORKING", async ($, on) => {
 	answer({ result: {} })
 	await call
 })
+
+test('pressing a log line unfolds the whole command, and pressing it again folds it', async ($, on) => {
+	const w: World = { status: STATUS }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	await $.tool.call({ tool: 'Bash', command: SCRIPT, tool_use_id: 'toolu_script' })
+	await clock.settle()
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	const shown = async () => JSON.stringify(await ui.find({ key: 'commands' }))
+	expect(await shown()).not.toContain('date > /tmp/now.txt')
+	await ui.press({ key: 'command-toolu_script' })
+	await clock.settle()
+	expect(await shown()).toContain('date > /tmp/now.txt && git branch --show-current')
+	await ui.press({ key: 'command-toolu_script' })
+	await clock.settle()
+	expect(await shown()).not.toContain('date > /tmp/now.txt')
+	await ui.unmount()
+})
+
+test('an errored command reads ✗', async ($, on) => {
+	const w: World = { status: STATUS }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	w.tool = () => ({ result: 'Exit code 1', isError: true })
+	await $.tool.call({ tool: 'Bash', command: 'false' })
+	await clock.settle()
+	expect(await logged($)).toContain('✗ ')
+})

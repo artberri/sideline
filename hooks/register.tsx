@@ -62,6 +62,8 @@ const selected = atom({ plugin: 'sideline', key: 'selected' } as const, null as 
 const diff = atom({ plugin: 'sideline', key: 'diff' } as const, null as FileDiff | null)
 const cursor = atom({ plugin: 'sideline', key: 'cursor' } as const, null as Cursor | null)
 const commands = atom({ plugin: 'sideline', key: 'commands' } as const, [] as LoggedCommand[])
+// The log line unfolded to its whole command, by tool_use_id.
+const openCommand = atom({ plugin: 'sideline', key: 'openCommand' } as const, null as string | null)
 const turn = atom({ plugin: 'sideline', key: 'turn' } as const, 'idle' as TurnState)
 
 const STATUS_COLOR: Record<FileStatus, Color> = {
@@ -268,10 +270,13 @@ export const register: Register = (on, options) => {
 			const id = e.tool_use_id
 			const settle = (state: LoggedCommand['state']) =>
 				update($, commands, (list) => list.map((one) => (one.id === id ? { ...one, state } : one)))
-			if (command !== undefined)
+			if (command !== undefined) {
 				await update($, commands, (list) =>
 					[...list, { id, command, state: 'running' as const }].slice(-LOG_SIZE),
 				)
+				const kept = new Set((await read($, commands)).map((one) => one.id))
+				await update($, openCommand, (open) => (open !== null && kept.has(open) ? open : null))
+			}
 			const result = await next(e).catch(async (error: unknown) => {
 				if (command !== undefined) await settle('failed')
 				throw error
@@ -458,6 +463,8 @@ export const register: Register = (on, options) => {
 		)
 		const changes = (body: JSX.Element) => titled('CHANGES', CHANGES_COLOR, body, 'changes')
 		const logged = await read($, commands)
+		const open = await read($, openCommand)
+		const logColumns = e.props.bodyColumns - 2 - BOX_FRAME
 		const log = titled(
 			'COMMANDS',
 			COMMAND_COLOR,
@@ -466,12 +473,31 @@ export const register: Register = (on, options) => {
 					<Text dimColor>no commands yet</Text>
 				) : (
 					logged.map((entry) => (
-						<Text key={`command-${entry.id}`} wrap="truncate">
-							<Text color={LOG_GLYPH_COLOR[entry.state]}>{`${LOG_GLYPH[entry.state]} `}</Text>
-							<Text dimColor={entry.state !== 'running'}>
-								{logLine(entry.command, e.props.bodyColumns - 2 - BOX_FRAME - 2)}
-							</Text>
-						</Text>
+						<Box key={`log-${entry.id}`} flexDirection="column">
+							<Box flexDirection="row">
+								<Text color={LOG_GLYPH_COLOR[entry.state]}>{`${LOG_GLYPH[entry.state]} `}</Text>
+								<elements.Button
+									key={`command-${entry.id}`}
+									plain
+									dimColor={entry.state !== 'running' || undefined}
+									label={logLine(entry.command, logColumns - 2)}
+									onPress={() =>
+										void update($, openCommand, (current) =>
+											current === entry.id ? null : entry.id,
+										)
+									}
+								/>
+							</Box>
+							{open === entry.id && (
+								<Box flexDirection="column" paddingLeft={2}>
+									{entry.command.split('\n').map((line, index) => (
+										<Text key={`command-${entry.id}-${index}`} dimColor wrap="wrap">
+											{line === '' ? ' ' : line}
+										</Text>
+									))}
+								</Box>
+							)}
+						</Box>
 					))
 				)}
 			</Box>,

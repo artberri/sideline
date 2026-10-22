@@ -12,10 +12,10 @@ five shell commands, one line each with their state, where clicking a line shows
 - **B2.** It lists the last five Bash commands, oldest at the top and newest at the bottom, one line each: a script
   shows its first line, and each line is cut with `…` to the width inside the box. — _proved by:_ `tests/pane.test.ts` › "the log keeps the last five commands, oldest first", "logLine is the first line after $, cut to the width, with … for a script", "a long command line is cut to the width inside its box"
 - **B3.** Each line starts with its state: `●` running (orange), `✓` finished, `✗` failed, refused or interrupted
-  (red). — _proved by:_ `tests/pane.test.ts` › "a running command reads ●, then ✓ once it ends, and stays in the log", "a failed or interrupted command reads ✗"
+  (red). — _proved by:_ `tests/pane.test.ts` › "a running command reads ●, then ✓ once it ends, and stays in the log", "a failed or interrupted command reads ✗", "an errored command reads ✗"
 - **B4.** The log shows whatever `transcriptCommands` is set to. — _proved by:_ `tests/pane.test.ts` › "transcriptCommands: show still logs the command"
 - **B5.** Clicking a line shows the whole command in place, inside the box (every line, wrapped), with the other lines
-  still listed; clicking it again folds it back to one line. — _proved by:_
+  still listed; clicking it again folds it back to one line (no `h`: it already means back from a diff). — _proved by:_ `tests/pane.test.ts` › "pressing a log line unfolds the whole command, and pressing it again folds it"; clicks: manual
 - **B6.** The log lasts for the session and survives a reload of the mod; a new session starts it empty. — _proved
   by:_ manual
 
@@ -78,25 +78,25 @@ Decisions (2026-10-22, with the user):
       line, dim when finished.
 - [x] Run `bun run format` and `bun run check`.
 
-## Phase 2: Show a whole command when its line is clicked
+## Phase 2: Show a whole command when its line is clicked ✅
 
 **Description:** Clicking a log line unfolds the whole command in place; clicking it again folds it.
 
 **Test Checklist:**
 
-- [ ] Pane test (B5): pressing a line's button draws every line of the command; pressing it again draws one line.
-- [ ] Manual, live session (B5): clicking with the mouse and after ctrl+x tab — the pointer can't be driven from a
+- [x] Pane test (B5): pressing a line's button draws every line of the command; pressing it again draws one line.
+- [x] Manual, live session (B5): clicking with the mouse and after ctrl+x tab — the pointer can't be driven from a
       test.
-- [ ] Manual, live session (B6): the log is still there after a reload, empty in a new session.
+- [x] Manual, live session (B6): the log is still there after a reload, empty in a new session.
 
 **To-do:**
 
-- [ ] Add `openCommand: string | null` to the state contract and an atom.
-- [ ] Draw each log line as a `plain` `Button` (`key` `command-<id>`) whose `onPress` toggles `openCommand`.
-- [ ] Under the open line, draw the whole command: every line, wrapped to the box's width, dim.
-- [ ] Clear `openCommand` when its command leaves the log.
-- [ ] Run `bun run format` and `bun run check`.
+- [x] Add `openCommand: string | null` to the state contract and an atom.
+- [x] Draw each log line as a `plain` `Button` (`key` `command-<id>`) whose `onPress` toggles `openCommand`.
+- [x] Under the open line, draw the whole command: every line, wrapped to the box's width, dim.
+- [x] Clear `openCommand` when its command leaves the log.
+- [x] Run `bun run format` and `bun run check`.
 
 ## Next step
 
-Phase 2: draw each log line as a plain `Button` that unfolds the whole command in place.
+Done: both phases are in. A follow-up: scroll an unfolded command inside the box.
