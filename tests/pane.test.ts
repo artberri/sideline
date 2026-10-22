@@ -1052,3 +1052,25 @@ test('before any reading the usage line reads —', async ($, on) => {
 	expect(text).toContain('▱▱▱ —')
 	expect(text).toContain(' · 5h ')
 })
+
+test('an untracked file is counted again only after its size or modification time changes', async ($, on) => {
+	const ran: string[][] = []
+	const w: World = {
+		status: ['# branch.oid 0123456789abcdef', '# branch.head main', '? fresh.ts', ''].join('\0'),
+		untracked: { 'fresh.ts': '4\t0\t\0/dev/null\0fresh.ts\0' },
+		ran,
+	}
+	const clock = world(on, w, [])
+	let mtimeMs = 1_000
+	on('fs.stat', () => ({ value: { kind: 'file' as const, size: 40, mtimeMs, isLink: false } }))
+	const counted = () => ran.filter((argv) => argv.includes('--no-index') && argv.includes('--numstat')).length
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	expect(counted()).toBe(1)
+	await clock.advance(2_100)
+	await clock.advance(2_100)
+	expect(counted()).toBe(1)
+	expect(await drawn($, 'terminal')).toContain(' +4')
+	mtimeMs = 2_000
+	await clock.advance(2_100)
+	expect(counted()).toBe(2)
+})

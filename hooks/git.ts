@@ -105,13 +105,29 @@ export function parseNumstat(stdout: string): Map<string, LineCounts> {
 	return counts
 }
 
+// An untracked file's counts with the size and modification time they were read at, by absolute path: the poll runs
+// `git diff --no-index` again only for a file that changed. It starts empty on a reload.
+const untrackedCache = new Map<string, { size: number; mtimeMs: number; counts: LineCounts | undefined }>()
+
 async function untrackedCounts($: EngineInterface, cwd: string, files: ChangedFile[]) {
 	const counts = new Map<string, LineCounts>()
+	const seen = new Set<string>()
 	for (const file of files.filter((f) => f.isUntracked).slice(0, UNTRACKED_COUNT_LIMIT)) {
-		const run = await git($, cwd, ['diff', '--no-index', '--numstat', '-z', '--', '/dev/null', file.path])
-		const one = parseNumstat(run.stdout).get(file.path)
+		const path = `${cwd}/${file.path}`
+		seen.add(path)
+		// Without a stat (a file gone between status and now, a host without one) the file is read every time.
+		const stat = await $.fs.stat(path).catch(() => null)
+		const cached = untrackedCache.get(path)
+		let one = cached?.counts
+		if (!stat || !cached || cached.size !== stat.size || cached.mtimeMs !== stat.mtimeMs) {
+			const run = await git($, cwd, ['diff', '--no-index', '--numstat', '-z', '--', '/dev/null', file.path])
+			one = parseNumstat(run.stdout).get(file.path)
+			if (stat) untrackedCache.set(path, { size: stat.size, mtimeMs: stat.mtimeMs, counts: one })
+		}
 		if (one) counts.set(file.path, one)
 	}
+	// A file that is no longer untracked (added, deleted, ignored) leaves the cache.
+	for (const path of untrackedCache.keys()) if (!seen.has(path)) untrackedCache.delete(path)
 	return counts
 }
 
