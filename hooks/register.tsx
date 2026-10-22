@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { Color, EngineInterface, Register } from 'claude-code'
+import type { ClientElements, Color, EngineInterface, Register } from 'claude-code'
 
 import type {
 	ActiveEdit,
@@ -289,6 +289,42 @@ async function finishEdit($: EngineInterface, id: string, startedAt: number): Pr
 	else flash()
 }
 
+type TitledBox = { name: string; color: Color; key: string; rows?: number; footer?: string; background?: string }
+
+// A rounded box with its caps title laid over the top border, at the left, and `footer` over the bottom border, at the
+// right: each a sibling drawn after the box, so it paints over the border rather than inside the box's clip. `rows`
+// fixes the box's content rows; without it the box takes every row left.
+function titled(
+	{ Box, Text }: Pick<ClientElements, 'Box' | 'Text'>,
+	{ name, color, key, rows, footer = '', background }: TitledBox,
+	body: JSX.Element,
+) {
+	return (
+		<Box key={key} flexDirection="column" flexGrow={rows === undefined ? 1 : 0} flexShrink={0}>
+			<Box
+				key={`${key}-box`}
+				flexDirection="column"
+				borderStyle="round"
+				borderColor={color}
+				paddingX={1}
+				overflow="hidden"
+				flexGrow={rows === undefined ? 1 : 0}
+				height={rows === undefined ? undefined : rows + 2}
+			>
+				{body}
+			</Box>
+			<Box position="absolute" top={0} left={2}>
+				<Text color={color} bold backgroundColor={background}>{` ${name} `}</Text>
+			</Box>
+			{footer !== '' && (
+				<Box position="absolute" bottom={0} right={2}>
+					<Text color={color} backgroundColor={background}>{` ${footer} `}</Text>
+				</Box>
+			)}
+		</Box>
+	)
+}
+
 export const register: Register = (on, options) => {
 	const background = backgroundOption(options.background)
 	const hoverBackground = background ? lighten(background) : null
@@ -534,42 +570,15 @@ export const register: Register = (on, options) => {
 				</Text>
 			</Box>
 		)
-		// A rounded box with its caps title laid over the top border, at the left: the title is a sibling drawn after the
-		// box, so it paints over the border rather than inside the box's clip.
-		// `rows` fixes the box's content rows; without it the box takes every row left.
-		const titled = (name: string, color: Color, body: JSX.Element, key: string, rows?: number, footer = '') => (
-			<Box key={key} flexDirection="column" flexGrow={rows === undefined ? 1 : 0} flexShrink={0}>
-				<Box
-					key={`${key}-box`}
-					flexDirection="column"
-					borderStyle="round"
-					borderColor={color}
-					paddingX={1}
-					overflow="hidden"
-					flexGrow={rows === undefined ? 1 : 0}
-					height={rows === undefined ? undefined : rows + 2}
-				>
-					{body}
-				</Box>
-				<Box position="absolute" top={0} left={2}>
-					<Text color={color} bold backgroundColor={background}>{` ${name} `}</Text>
-				</Box>
-				{footer !== '' && (
-					<Box position="absolute" bottom={0} right={2}>
-						<Text color={color} backgroundColor={background}>{` ${footer} `}</Text>
-					</Box>
-				)}
-			</Box>
-		)
 		const changes = (body: JSX.Element, footer = '') =>
-			titled('CHANGES', CHANGES_COLOR, body, 'changes', undefined, footer)
+			titled(elements, { name: 'CHANGES', color: CHANGES_COLOR, key: 'changes', footer, background }, body)
 		const logged = await read($, commands)
 		const isInCommands = (await read($, focusedCommand)) !== null
 		const open = await read($, openCommand)
 		const logColumns = e.props.bodyColumns - BOX_FRAME
 		const log = titled(
-			'COMMANDS',
-			COMMAND_COLOR,
+			elements,
+			{ name: 'COMMANDS', color: COMMAND_COLOR, key: 'commands', rows: LOG_SIZE, background },
 			<Box flexDirection="column">
 				{logged.length === 0 && <Text dimColor>no commands yet</Text>}
 				{logged.map((entry) => (
@@ -585,8 +594,6 @@ export const register: Register = (on, options) => {
 					</Box>
 				))}
 			</Box>,
-			'commands',
-			LOG_SIZE,
 		)
 		if (shown.kind === 'loading')
 			return fill(
