@@ -690,12 +690,13 @@ test('the hints sit under the title, above the tree, and only with changes', asy
 	expect(hint).toBeLessThan(text.indexOf('main'))
 })
 
-test('with no changes the pane shows no hints', async ($, on) => {
-	world(on, { status: ['# branch.oid 0123456789abcdef', '# branch.head main', ''].join('\0') }, [])
+test('the hints show even with no changes, no commits and no commands', async ($, on) => {
+	world(on, { status: ['# branch.oid 0123456789abcdef', '# branch.head main', ''].join('\0'), logExit: 128 }, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	const text = await drawn($, 'terminal')
 	expect(text).toContain('No uncommitted changes')
-	expect(text).not.toContain('"label":"down"')
+	expect(text).toContain('"label":"down"')
+	expect(text).not.toContain('"hotkey":"c"')
 })
 
 test('an interrupted turn sets the title back to IDLE', async ($, on) => {

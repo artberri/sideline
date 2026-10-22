@@ -785,13 +785,8 @@ export const register: Register = (on, options) => {
 			isBinary: row.isBinary,
 		}))
 		const commit = await read($, viewing)
-		const isListingCommits = rows.length === 0 && !diffView && !commandView && !commit && shown.commits.length > 0
-		const hints = (rows.length > 0 ||
-			diffView ||
-			commandView ||
-			logged.length > 0 ||
-			commit ||
-			isListingCommits) && (
+		// The keys are always listed in a repo, so the way around (the tree, the commits, the commands) is never hidden.
+		const hints = (
 			<Box flexDirection="column" alignItems="center" marginTop={1}>
 				<Box flexDirection="row">
 					{commandView ? (
@@ -897,7 +892,7 @@ export const register: Register = (on, options) => {
 			</Text>
 		)
 		const filesLabel = `${fileCount} file${fileCount === 1 ? '' : 's'}`
-		const windowRows = changesRows(e.props.scroll.bodyRows, Boolean(hints), isShowingSession)
+		const windowRows = changesRows(e.props.scroll.bodyRows, true, isShowingSession)
 		const innerColumns = e.props.bodyColumns - BOX_FRAME
 		const commandRows = commandView ? wrapLines(commandView.command, innerColumns) : []
 		const diffLines = diffView && diffView.hunks !== '' ? diffView.hunks.replace(/\n$/, '').split('\n') : []
