@@ -19,6 +19,11 @@ here (or move it into the plan) once it is planned.
 - **Check the file icons on a real Nerd Font.** The table in `hooks/icons.ts` was built from nerd-fonts'
   `glyphnames.json` but never reviewed in the pane; swap any glyph that draws as a box or a blank. _From: adding the
   file-type icons._
+- **Fold other tools' long inputs.** Agent prompts and MCP calls can print long inputs in the transcript too; they
+  could show a short label the way Bash rows show their description. _From: the hide-bash-commands plan._
+- **`tsc` fails on the first `$.tool.call` it checks.** Any test file that sorts before `tests/pane.test.ts` makes
+  `tsc -p .` hit TS2589 at its first `$.tool.call`, even an empty file; typing the call's argument doesn't help. New
+  test suites go in a file that sorts after it, until the cause is found. _From: the hide-bash-commands plan._
 
 ## Ideas
 
