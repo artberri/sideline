@@ -27,6 +27,7 @@ import {
 	statusSymbols,
 } from './symbols'
 import { resolveCursor, treeRows } from './tree'
+import { changesRows, clampOffset, hiddenAround, hiddenLabel, isOverCommands, wrapLines } from './window'
 import type { TreeRow } from './tree'
 
 const PANE = 'sideline'
@@ -64,6 +65,8 @@ const cursor = atom({ plugin: 'sideline', key: 'cursor' } as const, null as Curs
 const commands = atom({ plugin: 'sideline', key: 'commands' } as const, [] as LoggedCommand[])
 // The log line unfolded to its whole command, by tool_use_id.
 const openCommand = atom({ plugin: 'sideline', key: 'openCommand' } as const, null as string | null)
+// The first line the changes box shows of its tree, diff or command.
+const changesOffset = atom({ plugin: 'sideline', key: 'changesOffset' } as const, 0)
 const turn = atom({ plugin: 'sideline', key: 'turn' } as const, 'idle' as TurnState)
 
 const STATUS_COLOR: Record<FileStatus, Color> = {
@@ -78,6 +81,8 @@ let refreshing: Promise<void> | null = null
 let isRefreshQueued = false
 // The last description a live group's line showed, for the moment the next call's input is still being written.
 let lastDescription: string | undefined
+// The changes box's last drawn window, which a scroll clamps to: its content's lines and the rows it shows.
+let changesWindow = { lines: 0, rows: 0 }
 // Claude Code's row dot on this machine, read at session start.
 let rowDot = rowDotFor('')
 
@@ -89,6 +94,7 @@ async function readAndStore($: EngineInterface): Promise<void> {
 }
 
 async function closeDiff($: EngineInterface): Promise<void> {
+	await update($, changesOffset, () => 0)
 	await update($, selected, () => null)
 	await update($, diff, () => null)
 }
@@ -162,6 +168,7 @@ async function currentTree($: EngineInterface): Promise<{ rows: TreeRow[]; edite
 
 async function openFile($: EngineInterface, path: string): Promise<void> {
 	await update($, openCommand, () => null)
+	await update($, changesOffset, () => 0)
 	await update($, selected, () => path)
 	await refresh($)
 }
@@ -170,6 +177,7 @@ async function openFile($: EngineInterface, path: string): Promise<void> {
 async function toggleCommand($: EngineInterface, id: string): Promise<void> {
 	const isOpen = (await read($, openCommand)) === id
 	if (!isOpen) await closeDiff($)
+	await update($, changesOffset, () => 0)
 	await update($, openCommand, () => (isOpen ? null : id))
 }
 
@@ -191,7 +199,10 @@ async function stepDiff($: EngineInterface, rows: TreeRow[], open: string, by: n
 // One key, from the rows Client or a legend hotkey: moves the selection, opens its file, or closes the diff.
 async function navigate($: EngineInterface, key: string): Promise<void> {
 	if ((await read($, openCommand)) !== null) {
-		if (BACK.has(key)) await update($, openCommand, () => null)
+		if (BACK.has(key)) {
+			await update($, openCommand, () => null)
+			await update($, changesOffset, () => 0)
+		}
 		return
 	}
 	const open = await read($, selected)
@@ -321,6 +332,18 @@ export const register: Register = (on, options) => {
 		else await finishEdit($, edit.id, startedAt)
 		void refresh($)
 		return result
+	})
+
+	// The pane always fits its rows, so the engine never scrolls it: a wheel tick over the changes box moves that box's
+	// own window, and the scroll keys (no pointer) move it too. A tick over the commands box moves nothing.
+	on('ui.scroll', { requestId: PANE }, async ($, e) => {
+		if (!isOverCommands(e.pointer?.row, e.bodyRows)) {
+			const { lines, rows } = changesWindow
+			await update($, changesOffset, (offset) =>
+				clampOffset(clampOffset(offset, lines, rows) + e.by, lines, rows),
+			)
+		}
+		return {}
 	})
 
 	on('ui.message', { requestId: PANE, element: 'rows' }, async ($, e) => {
@@ -462,7 +485,7 @@ export const register: Register = (on, options) => {
 		// A rounded box with its caps title laid over the top border, at the left: the title is a sibling drawn after the
 		// box, so it paints over the border rather than inside the box's clip.
 		// `rows` fixes the box's content rows; without it the box takes every row left.
-		const titled = (name: string, color: Color, body: JSX.Element, key: string, rows?: number) => (
+		const titled = (name: string, color: Color, body: JSX.Element, key: string, rows?: number, footer = '') => (
 			<Box key={key} flexDirection="column" flexGrow={rows === undefined ? 1 : 0} flexShrink={0}>
 				<Box
 					key={`${key}-box`}
@@ -479,9 +502,15 @@ export const register: Register = (on, options) => {
 				<Box position="absolute" top={0} left={2}>
 					<Text color={color} bold backgroundColor={background}>{` ${name} `}</Text>
 				</Box>
+				{footer !== '' && (
+					<Box position="absolute" bottom={0} right={2}>
+						<Text color={color} backgroundColor={background}>{` ${footer} `}</Text>
+					</Box>
+				)}
 			</Box>
 		)
-		const changes = (body: JSX.Element) => titled('CHANGES', CHANGES_COLOR, body, 'changes')
+		const changes = (body: JSX.Element, footer = '') =>
+			titled('CHANGES', CHANGES_COLOR, body, 'changes', undefined, footer)
 		const logged = await read($, commands)
 		const open = await read($, openCommand)
 		const logColumns = e.props.bodyColumns - BOX_FRAME
@@ -622,11 +651,26 @@ export const register: Register = (on, options) => {
 						</Box>
 					)}
 				</Box>
-				<Text dimColor wrap="wrap">
+				<Text dimColor wrap="truncate-end">
 					{FOCUS_HINT}
 				</Text>
 			</Box>
 		)
+		const windowRows = changesRows(e.props.scroll.bodyRows, Boolean(hints))
+		const innerColumns = e.props.bodyColumns - BOX_FRAME
+		const commandRows = commandView ? wrapLines(commandView.command, innerColumns) : []
+		const diffLines = diffView && diffView.hunks !== '' ? diffView.hunks.replace(/\n$/, '').split('\n') : []
+		// A diff or a command keeps its header row and the blank row under it above the window.
+		const shownRows = commandView || diffView ? Math.max(1, windowRows - 2) : windowRows
+		const lineCount = commandView ? commandRows.length : diffView ? diffLines.length : rows.length
+		changesWindow = { lines: lineCount, rows: shownRows }
+		const offset = clampOffset(await read($, changesOffset), lineCount, shownRows)
+		const footer = hiddenLabel(hiddenAround(offset, lineCount, shownRows))
+		const windowDiff = diffView && {
+			...diffView,
+			hunks: diffView.hunks === '' ? '' : diffLines.slice(offset, offset + shownRows).join('\n') + '\n',
+		}
+		const windowTree = rows.slice(offset, offset + shownRows)
 		return fill(
 			<Box flexDirection="column" flexGrow={1}>
 				{title}
@@ -650,10 +694,8 @@ export const register: Register = (on, options) => {
 										onPress={() => void toggleCommand($, commandView.id)}
 									/>
 									<Box flexDirection="column" marginTop={1}>
-										{commandView.command.split('\n').map((line, index) => (
-											<Text key={`command-line-${index}`} wrap="wrap">
-												{index === 0 ? `$ ${line}` : line === '' ? ' ' : line}
-											</Text>
+										{commandRows.slice(offset, offset + shownRows).map((line, index) => (
+											<Text key={`command-line-${offset + index}`}>{line}</Text>
 										))}
 									</Box>
 								</Box>
@@ -663,15 +705,22 @@ export const register: Register = (on, options) => {
 								<elements.Client
 									key="rows"
 									module="./rows.tsx"
-									props={{ rows, hoverBackground, diff: diffView, cursor: cursorId }}
+									props={{
+										rows: windowTree,
+										hoverBackground,
+										diff: windowDiff,
+										cursor: cursorId,
+										offset,
+									}}
 								/>
-							) : diffView ? (
-								drawDiff(diffView, elements, () => void closeDiff($))
+							) : windowDiff ? (
+								drawDiff(windowDiff, elements, () => void closeDiff($))
 							) : (
-								drawRows({ rows, hoverBackground }, elements, 0, -1, cursorId)
+								drawRows({ rows: windowTree, hoverBackground }, elements, 0, -1, cursorId)
 							)}
 						</Box>
 					</Box>,
+					footer,
 				)}
 				{log}
 			</Box>,

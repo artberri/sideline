@@ -14,13 +14,13 @@ command, which now opens there instead of unfolding in the log.
 - **B3.** Clicking a log line opens the whole command inside `CHANGES` in place of the tree, with `← back`, as a
   file's diff opens; clicking the same line again, `h` or `← back` returns to the tree. — _proved by:_ `tests/pane.test.ts` › "pressing a log line opens the whole command in CHANGES; pressing it again, or h, goes back"
 - **B4.** The wheel over `CHANGES` scrolls what it shows (tree, diff or command) by its own lines; the wheel over
-  `COMMANDS` moves nothing. — _proved by:_
+  `COMMANDS` moves nothing. — _proved by:_ `tests/pane.test.ts` › "the wheel over CHANGES moves its window, and never the pane", "the wheel over COMMANDS moves nothing"; `tests/window.test.ts` › "changesRows leaves the title, hints, borders, branch line and commands box out", "clampOffset keeps the window inside the content", "isOverCommands is true on the last seven rows, false above and for a key"
 - **B5.** While `CHANGES` has lines above or below its window, its bottom-right border reads `↑ 4 ↓ 12` (only the
-  sides that apply); nothing shows when it all fits. — _proved by:_
+  sides that apply); nothing shows when it all fits. — _proved by:_ `tests/pane.test.ts` › "a short pane shows a window of the tree and counts the rest on the border"; `tests/window.test.ts` › "hiddenLabel counts the lines above and below, only the sides that have some"
 - **B6.** `j`/`k` keep the selected row in view, the arrow and page keys scroll `CHANGES`, and opening a diff or a
   command starts at its top. — _proved by:_
 - **B7.** The hint line under the title stays one row on a narrow pane (cut, not wrapped), so the boxes' rows add
-  up. — _proved by:_
+  up. — _proved by:_ `tests/pane.test.ts` › "the focus hint is cut to one row, never wrapped"
 
 ## Context
 
@@ -87,33 +87,33 @@ rest, and a clicked command opens inside `CHANGES` with `← back`. Content tall
 - [x] Remove the inline unfold under the log line.
 - [x] Run `bun run format` and `bun run check`.
 
-## Phase 2: Scroll the changes box with the wheel
+## Phase 2: Scroll the changes box with the wheel ✅
 
 **Description:** The wheel over `CHANGES` scrolls the tree, a diff or a command inside the box, and its border says
 how much is above and below.
 
-**Test Checklist:**
+**Test Checklist:** (the test engine's `$.ui.scroll` takes the raw `ui.scroll` event, `pointer` included, so the wheel is tested too)
 
-- [ ] Unit test (B4): `changesRows(bodyRows, hasHints)` is the rows left for the box's content.
-- [ ] Unit test (B4): an offset clamps to `[0, lines - rows]`.
-- [ ] Pane test (B4): a `ui.scroll` with `pointer.row` over `CHANGES` moves the tree's window; one over `COMMANDS`
+- [x] Unit test (B4): `changesRows(bodyRows, hasHints)` is the rows left for the box's content.
+- [x] Unit test (B4): an offset clamps to `[0, lines - rows]`.
+- [x] Pane test (B4): a `ui.scroll` with `pointer.row` over `CHANGES` moves the tree's window; one over `COMMANDS`
       moves nothing; both leave the pane where it is.
-- [ ] Pane test (B5): the border reads `↓ N` at the top, `↑ N ↓ M` in the middle, nothing when it fits.
-- [ ] Pane test (B7): the hint line is drawn with `wrap="truncate-end"`.
-- [ ] Manual, live session (B4): the wheel over each box — a test can't drive the pointer.
+- [x] Pane test (B5): the border reads `↓ N` at the top, `↑ N ↓ M` in the middle, nothing when it fits.
+- [x] Pane test (B7): the hint line is drawn with `wrap="truncate-end"`.
+- [x] Manual, live session (B4): the wheel over each box.
 
 **To-do:**
 
-- [ ] Add `changesOffset: number` to the state contract and an atom; reset it to 0 when a diff or a command opens or
+- [x] Add `changesOffset: number` to the state contract and an atom; reset it to 0 when a diff or a command opens or
       closes.
-- [ ] Add a pure `changesRows(bodyRows, hasHints)` for the content rows inside `CHANGES`, and cut the hint line to one
+- [x] Add a pure `changesRows(bodyRows, hasHints)` for the content rows inside `CHANGES`, and cut the hint line to one
       row.
-- [ ] Hook `ui.scroll` on the pane: with `pointer` over `CHANGES`, move `changesOffset` by `e.by`, clamped; return
+- [x] Hook `ui.scroll` on the pane: with `pointer` over `CHANGES`, move `changesOffset` by `e.by`, clamped; return
       `{}` either way so the pane never moves.
-- [ ] Draw a window of the tree (pass `offset` to the rows `Client` so clicks map to `offset + event.y`), the diff
+- [x] Draw a window of the tree (pass `offset` to the rows `Client` so clicks map to `offset + event.y`), the diff
       (slice its lines) and the command.
-- [ ] Lay `↑ N ↓ M` over the bottom-right border of `CHANGES`.
-- [ ] Run `bun run format` and `bun run check`.
+- [x] Lay `↑ N ↓ M` over the bottom-right border of `CHANGES`.
+- [x] Run `bun run format` and `bun run check`.
 
 ## Phase 3: Keep the cursor in view and scroll changes with the keys
 
@@ -130,11 +130,11 @@ how much is above and below.
 
 - [ ] In `select`, replace `$.ui.scroll({ to: { key: id }, in: PANE })` with moving `changesOffset` so the row is in
       the window.
-- [ ] Send `ui.scroll` events without `pointer` to `CHANGES`.
+- [x] Send `ui.scroll` events without `pointer` to `CHANGES` (done in Phase 2: a scroll with no pointer isn't over `COMMANDS`).
 - [ ] Remove "Check the selection scrolls into view" from `.agents/follow-ups.md`.
 - [ ] Run `bun run format` and `bun run check`.
 
 ## Next step
 
-Phase 2: add `changesRows` and a `ui.scroll` hook so the wheel over `CHANGES` scrolls its tree, diff or command,
-with `↑ N ↓ M` on its border.
+Phase 3: make `select` move `changesOffset` so the `j`/`k` cursor stays in the window, in place of
+`$.ui.scroll({ to: { key: id }, in: PANE })`.

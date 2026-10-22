@@ -22,6 +22,8 @@ export type RowsProps = {
 	hoverBackground: string | null
 	diff: DiffView | null
 	cursor: string | null
+	// The tree's index of the first row in `rows`: the changes box draws a window of the tree.
+	offset: number
 }
 
 type Local = { phase: number; hovered: number; stop?: () => void }
@@ -170,7 +172,7 @@ export const Rows: ClientModule<RowsProps, Local> = (props, surface) => {
 		if (hovered !== current.hovered) surface.setState({ ...current, hovered })
 		if (event.type !== 'down' || (event.button ?? 'left') !== 'left') return
 		const row = props.rows[event.y]
-		if (row) surface.post({ press: row.id, kind: row.kind, index: event.y })
+		if (row) surface.post({ press: row.id, kind: row.kind, index: props.offset + event.y })
 	})
 	return drawRows(props, surface.elements, state.phase, state.hovered, props.cursor)
 }

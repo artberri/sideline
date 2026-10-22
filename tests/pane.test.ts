@@ -24,7 +24,7 @@ const PANE = {
 		isFocused: false,
 		bodyColumns: 40,
 		placement: 'dock',
-		scroll: { offset: 0, bodyRows: 20 },
+		scroll: { offset: 0, bodyRows: 60 },
 		view: {},
 	},
 } as const
@@ -808,7 +808,7 @@ test('the pane has no outer padding and fills its rows exactly', async ($, on) =
 	await ui.unmount()
 	expect(outer.props.paddingX).toBeUndefined()
 	expect(outer.props.paddingY).toBeUndefined()
-	expect(outer.props.height).toBe(20)
+	expect(outer.props.height).toBe(60)
 })
 
 test('COMMANDS is always five lines tall and CHANGES takes the rest', async ($, on) => {
@@ -839,4 +839,75 @@ test('an errored command reads ✗', async ($, on) => {
 	await $.tool.call({ tool: 'Bash', command: 'false' })
 	await clock.settle()
 	expect(await logged($)).toContain('✗ ')
+})
+
+const MANY = [
+	'# branch.oid 0123456789abcdef',
+	'# branch.head main',
+	...Array.from({ length: 12 }, (_, n) => `? file${String(n).padStart(2, '0')}.ts`),
+	'',
+].join('\0')
+
+async function shortPane($: Engine) {
+	const ui = await $.ui.mount({
+		...PANE,
+		surface: 'terminal',
+		props: { ...PANE.props, scroll: { offset: 0, bodyRows: 20 } },
+	})
+	const box = JSON.stringify(await ui.find({ key: 'changes' }))
+	await ui.unmount()
+	return box
+}
+
+test('a short pane shows a window of the tree and counts the rest on the border', async ($, on) => {
+	world(on, { status: MANY }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	// 20 rows: title 1, hints 3, the box's border 2, branch line and blank 2, commands 7 leave 5.
+	const box = await shortPane($)
+	expect(box).toContain('file00.ts')
+	expect(box).toContain('file04.ts')
+	expect(box).not.toContain('file05.ts')
+	expect(box).toContain(' ↓ 7 ')
+})
+
+// A wheel tick, or with no `row` a scroll key, on the 20-row pane.
+const wheel = (by: number, row?: number) => ({
+	component: 'Pane' as const,
+	requestId: 'sideline',
+	offset: 0,
+	by,
+	bodyRows: 20,
+	contentRows: 20,
+	origin: { kind: 'person' as const },
+	...(row === undefined ? {} : { pointer: { column: 5, row } }),
+})
+
+test('the wheel over CHANGES moves its window, and never the pane', async ($, on) => {
+	world(on, { status: MANY }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	await shortPane($)
+	expect(await $.ui.scroll(wheel(3, 6))).toEqual({})
+	const box = await shortPane($)
+	expect(box).not.toContain('file02.ts')
+	expect(box).toContain('file03.ts')
+	expect(box).toContain(' ↑ 3 ↓ 4 ')
+	await $.ui.scroll(wheel(50, 6))
+	expect(await shortPane($)).toContain(' ↑ 7 ')
+})
+
+test('the wheel over COMMANDS moves nothing', async ($, on) => {
+	world(on, { status: MANY }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	await shortPane($)
+	expect(await $.ui.scroll(wheel(3, 15))).toEqual({})
+	expect(await shortPane($)).toContain('file00.ts')
+})
+
+test('the focus hint is cut to one row, never wrapped', async ($, on) => {
+	world(on, { status: STATUS }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	const hint = await ui.find({ type: 'Text', text: /ctrl\+x tab/ })
+	await ui.unmount()
+	expect(hint?.props.wrap).toBe('truncate-end')
 })
