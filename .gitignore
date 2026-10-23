@@ -1,6 +1,4 @@
 plugin/.claude-plugin/types/
 .DS_Store
 node_modules/
-# No lockfile: package.json with one at the plugin root makes Claude Code install the packages for every user.
-bun.lock
 .claude/settings.local.json

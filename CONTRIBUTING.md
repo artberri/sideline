@@ -26,15 +26,11 @@ You need **Claude Code**, recent enough to load mods (`claude --version`), and *
 2. Install the dev tools:
 
     ```sh
-    bun install
+    bun install --frozen-lockfile
     ```
 
 `package.json` holds dev tools only (oxfmt, oxlint, TypeScript). The mod itself has no dependencies and no build step:
-Claude Code loads `hooks/register.tsx` as it is.
-
-The dev tools are pinned to exact versions in `package.json`, and there's no lockfile on purpose: with `package.json`
-and a lockfile at the plugin root, Claude Code installs those packages on every user's machine when they install
-sideline. Don't commit `bun.lock`; to move a tool, change its version in `package.json`.
+Claude Code loads `plugin/hooks/register.tsx` as it is.
 
 ## Running it while you work
 
