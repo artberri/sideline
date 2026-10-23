@@ -135,28 +135,33 @@ command), then assert on what the hooks draw or store; `tests/pane.test.ts` is t
 
 ## Releasing
 
-sideline is installed from the [artberri marketplace](https://github.com/artberri/claude-plugins), which points at this
-repository's default branch. Claude Code decides what to hand out by the `version` in
-[`.claude-plugin/plugin.json`](.claude-plugin/plugin.json):
+sideline is installed from the [artberri marketplace](https://github.com/artberri/claude-plugins), whose entry pins it
+to a release tag (`"ref": "v0.1.0"`). So `main` can move freely: new installs get the pinned tag, never unreleased
+work. Existing installs get a new copy only when the `version` in
+[`.claude-plugin/plugin.json`](.claude-plugin/plugin.json) changes, when the user updates (`claude plugin update
+sideline@artberri`) or, with auto-update on for the marketplace, at their next session start.
 
-- **A new install** gets whatever is on `main` at that moment, so keep `main` working.
-- **An existing install** gets a new copy only when `version` changes: when the user updates (`claude plugin update
-  sideline@artberri`), or on their next session start if they turned on auto-update for the marketplace. Commits pushed
-  without a version change don't reach them.
+Every change worth telling users about adds a line under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md), in the same
+pull request.
 
 To release (maintainers):
 
 1. Make sure `bun run check` is green on `main`.
-2. Bump `version` in `.claude-plugin/plugin.json` ([Semantic Versioning](https://semver.org): a fix bumps the patch, a
-   new feature or option the minor, a change that breaks an option or a setting the major).
-3. Commit it alone as `chore: release <version>`, tag that commit `v<version>`, and push both:
+2. Pick the version ([Semantic Versioning](https://semver.org): a fix bumps the patch, a new feature or option the
+   minor, a change that breaks an option or a setting the major).
+3. In `CHANGELOG.md`, rename `## [Unreleased]` to `## [<version>] - <date>`, add an empty `## [Unreleased]` above it,
+   and update the compare links at the bottom.
+4. Bump `version` in `.claude-plugin/plugin.json`, commit both as `chore: release <version>`, tag that commit, and push:
 
     ```sh
     git tag -s v0.2.0 -m "sideline 0.2.0"
     git push origin main v0.2.0
     ```
 
-4. Write the release notes on GitHub from the conventional commits since the last tag.
+5. Publish a GitHub release for the tag, with that version's changelog section as its notes.
+6. In the [marketplace repository](https://github.com/artberri/claude-plugins), move sideline's `ref` to the new tag,
+   run `claude plugin validate .`, commit as `feat: release sideline <version>` and push. This is the step that hands
+   the release out.
 
 Keep `version` only in `plugin.json`: the marketplace entry has none, and setting it in both makes Claude Code use
 `plugin.json`'s without a word.
