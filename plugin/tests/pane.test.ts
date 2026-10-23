@@ -699,23 +699,27 @@ test('a long command line is cut to the width inside its box', async ($, on) => 
 	const w: World = { status: STATUS }
 	const clock = world(on, w, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
-	held(w)
-	void $.tool.call({ tool: 'Bash', command: `echo ${'y'.repeat(100)}` })
+	const finish = held(w)
+	const call = $.tool.call({ tool: 'Bash', command: `echo ${'y'.repeat(100)}` })
 	await clock.settle()
 	const text = await logged($)
 	// 40 columns, less the box's border and padding (4) and the state glyph (2).
 	expect(text).toContain(`$ echo ${'y'.repeat(26)}…`)
 	expect(text).not.toContain('y'.repeat(27))
+	finish({ result: {} })
+	await call
 })
 
 test('transcriptCommands: show still logs the command', { options: { transcriptCommands: 'show' } }, async ($, on) => {
 	const w: World = { status: STATUS }
 	const clock = world(on, w, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
-	held(w)
-	void $.tool.call({ tool: 'Bash', command: SCRIPT })
+	const finish = held(w)
+	const call = $.tool.call({ tool: 'Bash', command: SCRIPT })
 	await clock.settle()
 	expect(await logged($)).toContain('$ sleep 8 …')
+	finish({ result: {} })
+	await call
 })
 
 const TURN = { turnId: 't1', text: 'go' }
