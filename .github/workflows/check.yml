@@ -30,7 +30,7 @@ jobs:
         with:
           bun-version: ${{ steps.bun.outputs.version }}
 
-      - run: bun install --frozen-lockfile
+      - run: bun install
 
       - run: bun run format:check
 

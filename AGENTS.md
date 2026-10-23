@@ -76,7 +76,9 @@ Each of these cost a round to find:
 ## Tooling
 
 Bun is pinned with proto in `.prototools`; `proto use` installs it, then `bun install`. `package.json` holds dev tools
-only (oxlint, oxfmt, TypeScript): the mod itself has no dependencies and no build step.
+only (oxlint, oxfmt, TypeScript), pinned to exact versions: the mod itself has no dependencies and no build step. There's
+no lockfile on purpose (`bun.lock` is gitignored): with `package.json` and a lockfile at the plugin root, Claude Code
+installs those packages for every user who installs the plugin.
 
 `tsconfig.json` leaves out the generated MCP tool typings (`claude-code-mcp`): the mod calls no MCP tool, and with many
 MCP servers connected their union made the first `$.tool.call` tsc checked fail with TS2589, depending on file order.
