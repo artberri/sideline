@@ -136,9 +136,14 @@ main request, never the messages, and `tool.call` gives it each tool call's name
 the pane (a shell command in `COMMANDS`, an edited file's shimmer in `CHANGES`). None of it goes into a command or
 leaves Claude Code.
 
-What `stat` reads, an untracked file's size and modification time, only decides whether `git` counts that file's lines
-again; it goes into no command and is kept only for the session. Everything these commands print is drawn in the pane
-and nowhere else.
+It reads two things from your disk besides `git`'s output, and neither goes into a command or leaves Claude Code:
+
+- `$.fs.stat`: an untracked file's size and modification time, which only decide whether `git` counts that file's
+  lines again; they're kept only for the session.
+- `$.fs.list`: the file names in the two macOS Fonts folders, once per session with `glyphs` on `auto`, checked for
+  one containing `Nerd`. Only the answer, Nerd Font icons or plain ones, is kept; the names aren't.
+
+Everything these commands print is drawn in the pane and nowhere else.
 
 ## Troubleshooting
 
