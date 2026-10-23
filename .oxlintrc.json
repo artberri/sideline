@@ -8,5 +8,5 @@
 	"rules": {
 		"typescript/no-explicit-any": "error"
 	},
-	"ignorePatterns": [".claude-plugin/types/"]
+	"ignorePatterns": ["plugin/.claude-plugin/types/"]
 }

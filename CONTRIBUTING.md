@@ -38,10 +38,11 @@ sideline. Don't commit `bun.lock`; to move a tool, change its version in `packag
 
 ## Running it while you work
 
-Claude Code loads the mod straight from your clone, and reloads it as you change it. Either for one session:
+The mod itself is the `plugin/` folder; the rest of the repository (tooling, plans, the demo, these docs) never reaches
+users. Claude Code loads the mod straight from your clone, and reloads it as you change it. Either for one session:
 
 ```sh
-claude --plugin-dir /path/to/sideline
+claude --plugin-dir /path/to/sideline/plugin
 ```
 
 or for every session, by adding the folder to `CLAUDE_CODE_PLUGIN_DIRS` in your `~/.claude/settings.json` (several
@@ -50,7 +51,7 @@ folders are separated by `:`):
 ```json
 {
 	"env": {
-		"CLAUDE_CODE_PLUGIN_DIRS": "/path/to/sideline"
+		"CLAUDE_CODE_PLUGIN_DIRS": "/path/to/sideline/plugin"
 	}
 }
 ```
@@ -64,22 +65,24 @@ over, `$.state` and `$.store` survive. A hook that fails, or a module that doesn
 `sideline` instead; `claude --debug` has the full log. An option changed in `/config` reaches the mod on its next load
 (`/reload-plugins` forces one).
 
-The first time the mod loads, Claude Code writes its typings to `.claude-plugin/types/` (gitignored). They are the
-engine's API, and `tsc` needs them.
+The first time the mod loads, Claude Code writes its typings to `plugin/.claude-plugin/types/` (gitignored). They are
+the engine's API, and `tsc` needs them.
 
 Options go under `pluginConfigs` → `sideline` → `options` in settings, or through `/config`; the `userConfig` in
-[`.claude-plugin/plugin.json`](.claude-plugin/plugin.json) says what each does.
+[`plugin/.claude-plugin/plugin.json`](plugin/.claude-plugin/plugin.json) says what each does.
 
 ## Where things are
 
 ```
-.claude-plugin/plugin.json   manifest: name, version, options (userConfig), state contract
-hooks/register.tsx           the hooks: export const register: Register = (on, options) => { ... }
-hooks/*.ts(x)                small modules with pure helpers (git parsers, tree, rows, window, meters)
-types/index.d.ts             the $.state contract
-tests/*.test.ts(x)           test suites run by `claude plugin test`
-.agents/plans/               implementation plans; finished ones in done/
-.agents/follow-ups.md        follow-ups and ideas not planned yet
+plugin/                             the mod, and all that users install
+plugin/.claude-plugin/plugin.json   manifest: name, version, options (userConfig), state contract
+plugin/hooks/register.tsx           the hooks: export const register: Register = (on, options) => { ... }
+plugin/hooks/*.ts(x)                small modules with pure helpers (git parsers, tree, rows, window, meters)
+plugin/types/index.d.ts             the $.state contract
+plugin/tests/*.test.ts(x)           test suites run by `claude plugin test`
+plugin/README.md                    the user README (README.md at the root links to it)
+.agents/plans/                      implementation plans; finished ones in done/
+.agents/follow-ups.md               follow-ups and ideas not planned yet
 ```
 
 [AGENTS.md](AGENTS.md) has more on the engine API and the conventions; it is also what an AI agent working in the repo
@@ -89,11 +92,11 @@ reads first.
 
 - Everything outside the module goes through `$` (`$.process.run`, `$.clock`, `$.state`, `$.ui`): there is no DOM and
   no Node.
-- The API is `.claude-plugin/types/claude-code/index.d.ts`, about 20,000 lines. Search it for the event, `$` method or
-  element at hand (`'tool.call'`, `Pane: {`, `every:`) rather than reading it whole, and check a shape there instead
-  of guessing it.
-- Run git with `--no-optional-locks` (the `git()` helper in `hooks/git.ts` does), so polling never blocks Claude's own
-  git commands.
+- The API is `plugin/.claude-plugin/types/claude-code/index.d.ts`, about 20,000 lines. Search it for the event, `$`
+  method or element at hand (`'tool.call'`, `Pane: {`, `every:`) rather than reading it whole, and check a shape there
+  instead of guessing it.
+- Run git with `--no-optional-locks` (`gitFor` in `plugin/hooks/register.tsx` does), so polling never blocks Claude's
+  own git commands.
 
 ## Checks
 
@@ -101,7 +104,7 @@ Run both before you send a change:
 
 ```sh
 bun run format   # oxfmt, writes
-bun run check    # oxfmt --check, oxlint, tsc -p ., claude plugin validate ., claude plugin test .
+bun run check    # oxfmt --check, oxlint, tsc -p plugin, claude plugin validate plugin, claude plugin test plugin
 ```
 
 `tsc` needs the generated typings, so load the mod once first. CI (`.github/workflows/check.yml`) runs the same checks
@@ -110,7 +113,7 @@ except `tsc`, against the pinned Claude Code build and the latest one; only the 
 ## Tests
 
 Tests use `claude-code/testing`. Fake the world once in a helper (session, clock, canned stdout for each `git`
-command), then assert on what the hooks draw or store; `tests/pane.test.ts` is the example to follow.
+command), then assert on what the hooks draw or store; `plugin/tests/pane.test.ts` is the example to follow.
 
 - Fixing a bug, start with a test that fails because it reproduces the bug, then fix it and watch the test pass; it
   keeps the bug from coming back.
@@ -139,11 +142,11 @@ command), then assert on what the hooks draw or store; `tests/pane.test.ts` is t
 
 ## Releasing
 
-sideline is installed from the [artberri marketplace](https://github.com/artberri/claude-plugins), whose entry pins it
-to a release tag (`"ref": "v0.1.0"`). So `main` can move freely: new installs get the pinned tag, never unreleased
-work. Existing installs get a new copy only when the `version` in
-[`.claude-plugin/plugin.json`](.claude-plugin/plugin.json) changes, when the user updates (`claude plugin update
-sideline@artberri`) or, with auto-update on for the marketplace, at their next session start.
+sideline is installed from the [artberri marketplace](https://github.com/artberri/claude-plugins), whose entry fetches
+only the `plugin/` folder (a `git-subdir` source) at a release tag (`"ref": "v0.1.0"`). So `main` can move freely: new
+installs get the pinned tag, never unreleased work. Existing installs get a new copy only when the `version` in
+[`plugin/.claude-plugin/plugin.json`](plugin/.claude-plugin/plugin.json) changes, when the user updates (`claude plugin
+update sideline@artberri`) or, with auto-update on for the marketplace, at their next session start.
 
 Every change worth telling users about adds a line under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md), in the same
 pull request.
@@ -155,7 +158,8 @@ To release (maintainers):
    minor, a change that breaks an option or a setting the major).
 3. In `CHANGELOG.md`, rename `## [Unreleased]` to `## [<version>] - <date>`, add an empty `## [Unreleased]` above it,
    and update the compare links at the bottom.
-4. Bump `version` in `.claude-plugin/plugin.json`, commit both as `chore: release <version>`, tag that commit, and push:
+4. Bump `version` in `plugin/.claude-plugin/plugin.json`, commit both as `chore: release <version>`, tag that commit,
+   and push:
 
     ```sh
     git tag -s v0.2.0 -m "sideline 0.2.0"

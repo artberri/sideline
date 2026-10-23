@@ -27,9 +27,9 @@ sideline is a Claude Code mod (a plugin with a hooks module) kept in this reposi
 through `CLAUDE_CODE_PLUGIN_DIRS` in `~/.claude/settings.json`. Saving a file hot-reloads it in any interactive session,
 so a phase is checked by looking at the running session, not only by tests.
 
-- Manifest: `.claude-plugin/plugin.json`.
-- Hooks: `hooks/hooks.json` lists the module, `hooks/register.tsx` exports `register: Register`.
-- Typings: once the mod has loaded, `.claude-plugin/types/claude-code/index.d.ts` is the engine API (generated,
+- Manifest: `plugin/.claude-plugin/plugin.json` (the mod is the `plugin/` folder).
+- Hooks: `plugin/hooks/hooks.json` lists the module, `plugin/hooks/register.tsx` exports `register: Register`.
+- Typings: once the mod has loaded, `plugin/.claude-plugin/types/claude-code/index.d.ts` is the engine API (generated,
   gitignored). Grep it for the event, noun or element you plan to use; it is ~20,000 lines, so never read it whole.
 - Authoring guidance: the `plugin-authoring` skill. Load it before planning anything that touches the engine API.
 
@@ -43,7 +43,7 @@ reasonable default and let them course-correct.
 2. **What are the contracts involved?** The observable surfaces the change affects. Suggest a list if the user doesn't:
     - Engine events hooked (`session.start`, `tool.call`, `ui.render` on a `Pane`, `command.run`, ...)
     - Panes, bands, status entries, toasts, slash commands the person sees
-    - `$.state` / `$.store` values and their contract in `types/index.d.ts`
+    - `$.state` / `$.store` values and their contract in `plugin/types/index.d.ts`
     - `userConfig` options in `plugin.json` (they show up in `/config`)
     - External commands run through `$.process.run` (git, ...) and the output format parsed
     - Test suites (`*.test.ts(x)` run by `claude plugin test`)
@@ -55,7 +55,7 @@ reasonable default and let them course-correct.
 
 Read the code the task will touch. Without this, the plan is generic and the phase breakdown won't match reality.
 
-- Read `hooks/` and any existing plan in `.agents/plans/`, and check `.agents/follow-ups.md` for items the task
+- Read `plugin/hooks/` and any existing plan in `.agents/plans/`, and check `.agents/follow-ups.md` for items the task
   covers; remove them there once the plan includes them.
 - Check the engine API in the typings for every event, `$` method and element the plan will name. If the mod has not
   loaded yet, the `plugin-authoring` skill names a typings file for this build.
@@ -76,9 +76,9 @@ Before writing the file, walk the user through your proposed phases. Each phase 
 - It has a single responsibility. Drawing data and gathering it can share a phase; a new interaction (keys, clicks) is
   its own phase.
 - For feature / behaviour-change / fix phases, include a **Test Checklist**: the `claude plugin test` cases in
-  `tests/` worth writing (what the pane draws for a repo state, parsers, tree building), each naming the behaviour
-  rules it proves (`B1`, `B2`). A rule no test can prove is listed as a manual check in the live session, with the
-  reason.
+  `plugin/tests/` worth writing (what the pane draws for a repo state, parsers, tree building), each naming the
+  behaviour rules it proves (`B1`, `B2`). A rule no test can prove is listed as a manual check in the live session, with
+  the reason.
 
 Present the breakdown and ask for approval. **Do not create the plan file yet.** If the user pushes back on a phase
 boundary or a contract, iterate on the proposal in-chat before anything hits disk.
@@ -138,9 +138,9 @@ each rule's proving test as it goes.>
 
 ### Key files
 
-| Area | Files                                          |
-| ---- | ---------------------------------------------- |
-| ...  | [hooks/register.tsx](../../hooks/register.tsx) |
+| Area | Files                                                        |
+| ---- | ------------------------------------------------------------ |
+| ...  | [plugin/hooks/register.tsx](../../plugin/hooks/register.tsx) |
 
 ### Contracts
 

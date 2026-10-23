@@ -1,11 +1,8 @@
----
-name: execute-plan
-description: >-
-    Execute a plan from `.agents/plans/` one phase at a time, with tests where they pay off and small commits. Use this
-    skill whenever the user wants to execute, run, resume, or continue a plan — including the explicit `/execute-plan`
-    invocation, phrasings like "execute the plan", "start phase 1", "continue the plan", "work on the next phase", or
-    when the user points at a file in `.agents/plans/` and asks to implement it. For creating a plan, use `/create-plan`.
----
+--- name: execute-plan description: >- Execute a plan from `.agents/plans/` one phase at a time, with tests where they
+pay off and small commits. Use this skill whenever the user wants to execute, run, resume, or continue a plan —
+including the explicit `/execute-plan` invocation, phrasings like "execute the plan", "start phase 1", "continue the
+plan", "work on the next phase", or when the user points at a file in `.agents/plans/` and asks to implement it. For
+creating a plan, use `/create-plan`. ---
 
 # Executing a Plan
 
@@ -26,23 +23,23 @@ Plans in `.agents/plans/` are written by `/create-plan`. Each phase is a slice t
 Work through the phase's to-dos in order.
 
 - **Load the `plugin-authoring` skill first** in the session, and grep the typings
-  (`.claude-plugin/types/claude-code/index.d.ts`) for each event, `$` method and element before using it. Don't guess an
-  API shape.
+  (`plugin/.claude-plugin/types/claude-code/index.d.ts`) for each event, `$` method and element before using it. Don't
+  guess an API shape.
 - **Test what can break quietly:** parsers of git output, the tree builder, the symbol builder, and what the pane draws
   for a given repo state. Write the test alongside the code, before or after, whichever is quicker. Skip tests for
   plumbing a glance at the live pane proves.
-- **Tests live in `tests/*.test.ts(x)`** and use `claude-code/testing` (`test`, `expect`, `mock`), like
+- **Tests live in `plugin/tests/*.test.ts(x)`** and use `claude-code/testing` (`test`, `expect`, `mock`), like
   [claude-code-filetree's tests](https://github.com/data-goblin/claude-code-filetree/tree/main/tests): fake the
   environment once in a helper (`mock.env`, `mock.clock`, canned stdout for each `git` command `$.process.run` gets),
   then assert on what the hooks draw or store. Pure helpers are exported from their module and tested directly.
-- **Check it live.** The mod hot-reloads on save in any session that loads the working copy. When a to-do changes what the
-  pane shows, ask the user to look, or say what they should see.
+- **Check it live.** The mod hot-reloads on save in any session that loads the working copy. When a to-do changes what
+  the pane shows, ask the user to look, or say what they should see.
 - Don't widen the scope. Anything the phase doesn't cover goes in the summary as a follow-up.
 
 ## Step 3: Before each commit
 
-- [ ] `bun run format`, then `bun run check` (oxfmt check, oxlint, `tsc -p .`, `claude plugin validate .`,
-      `claude plugin test .`; `tsc` needs the generated typings, so the mod must have loaded once)
+- [ ] `bun run format`, then `bun run check` (oxfmt check, oxlint, `tsc -p plugin`, `claude plugin validate plugin`,
+      `claude plugin test plugin`; `tsc` needs the generated typings, so the mod must have loaded once)
 - [ ] Update the plan: tick the to-dos this commit finishes, fill in _proved by:_ for each behaviour rule a test now
       proves (test file and title), mark the phase title ✅ only when every to-do is ticked, and update `Next step`.
 - [ ] Stage the plan with the code, by explicit path.

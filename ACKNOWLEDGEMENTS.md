@@ -34,6 +34,6 @@ The branch header uses the default symbols and order of [Starship](https://stars
 
 ## Nerd Fonts
 
-The file-type icons in `hooks/icons.ts` are code points looked up in
+The file-type icons in `plugin/hooks/icons.ts` are code points looked up in
 [Nerd Fonts](https://github.com/ryanoasis/nerd-fonts)' `glyphnames.json`. sideline only names code points; it ships no
 font files.

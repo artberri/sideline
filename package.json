@@ -7,9 +7,9 @@
 		"format:check": "oxfmt --check .",
 		"lint": "oxlint .",
 		"lint:fix": "oxlint --fix .",
-		"typecheck": "tsc -p .",
-		"validate": "claude plugin validate .",
-		"test": "claude plugin test .",
+		"typecheck": "tsc -p plugin",
+		"validate": "claude plugin validate plugin",
+		"test": "claude plugin test plugin",
 		"check": "bun run format:check && bun run lint && bun run typecheck && bun run validate && bun run test"
 	},
 	"devDependencies": {
