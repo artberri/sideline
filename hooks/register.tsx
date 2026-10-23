@@ -9,6 +9,7 @@ import type {
 	Cursor,
 	FileDiff,
 	FileStatus,
+	Glyphs,
 	LoggedCommand,
 	SessionInfo,
 	Snapshot,
@@ -16,21 +17,14 @@ import type {
 } from '../types'
 import { LOG_SIZE, commandStep, hiddenCommandInput, logLine, runningDescription } from './commands'
 import { readCommitDiff, readCommitFiles, readDiff, readSnapshot } from './git'
+import type { Git } from './git'
 import { USAGE_LABEL, USAGE_SEPARATOR, bar, barWidth, level, modelName, percentLabel, readings } from './meter'
 import { rowIcon } from './icons'
 import { cutDiff, drawDiff, drawRows } from './rows'
 import type { RowSpec } from './rows'
 import { fitSubject, shortAge } from './commits'
 import { bashChangedFiles, countsLabel, fileRow, summarize } from './summary'
-import {
-	BRANCH_ICON,
-	backgroundOption,
-	lighten,
-	resolveGlyphs,
-	resolveRowDot,
-	rowDotFor,
-	statusSymbols,
-} from './symbols'
+import { BRANCH_ICON, backgroundOption, NERD_FONT_CHECK, lighten, rowDotFor, statusSymbols } from './symbols'
 import { resolveCursor, treeRows } from './tree'
 import {
 	SESSION_ROWS,
@@ -129,8 +123,46 @@ let commitsShown = 0
 // Claude Code's row dot on this machine, read at session start.
 let rowDot = rowDotFor('')
 
+// The engine calls the git readers make, written here: the directory reads a mod's engine calls only in the file that
+// declares its hooks.
+function gitFor($: EngineInterface): Git {
+	return {
+		run: (cwd, args) =>
+			$.process.run(['git', '--no-optional-locks', '-C', cwd, ...args], {
+				timeoutMs: 10_000,
+				env: { GIT_OPTIONAL_LOCKS: '0' },
+			}),
+		stat: async (path) => {
+			try {
+				return await $.fs.stat(path)
+			} catch {
+				return null
+			}
+		},
+	}
+}
+
+async function resolveGlyphs($: EngineInterface, option: unknown): Promise<Glyphs> {
+	if (option === 'nerd' || option === 'plain') return option
+	try {
+		const run = await $.process.run(['sh', '-c', NERD_FONT_CHECK], { timeoutMs: 5_000 })
+		return run.stdout.trim() === 'nerd' ? 'nerd' : 'plain'
+	} catch {
+		return 'plain'
+	}
+}
+
+async function resolveRowDot($: EngineInterface): Promise<string> {
+	try {
+		const run = await $.process.run(['uname', '-s'], { timeoutMs: 5_000 })
+		return rowDotFor(run.stdout)
+	} catch {
+		return rowDotFor('')
+	}
+}
+
 async function readAndStore($: EngineInterface): Promise<void> {
-	const next = await readSnapshot($, await $.session.cwd())
+	const next = await readSnapshot(gitFor($), await $.session.cwd())
 	const current = await read($, snapshot)
 	if (JSON.stringify(current) !== JSON.stringify(next)) await update($, snapshot, () => next)
 	await readSelectedDiff($, next)
@@ -153,7 +185,9 @@ async function readSelectedDiff($: EngineInterface, shown: Snapshot): Promise<vo
 		await closeDiff($)
 		return
 	}
-	const hunks = commit ? await readCommitDiff($, shown.root, commit.sha, path) : await readDiff($, shown.root, file)
+	const hunks = commit
+		? await readCommitDiff(gitFor($), shown.root, commit.sha, path)
+		: await readDiff(gitFor($), shown.root, file)
 	const next: FileDiff = { path, hunks }
 	const current = await read($, diff)
 	if (JSON.stringify(current) !== JSON.stringify(next)) await update($, diff, () => next)
@@ -276,7 +310,7 @@ async function navigateCommands($: EngineInterface, id: string, key: string): Pr
 async function openCommit($: EngineInterface, commit: Commit): Promise<void> {
 	const shown = await read($, snapshot)
 	if (shown.kind !== 'repo') return
-	const files = await readCommitFiles($, shown.root, commit.sha)
+	const files = await readCommitFiles(gitFor($), shown.root, commit.sha)
 	await closeDiff($)
 	await update($, cursor, () => null)
 	await update($, viewing, () => ({ sha: commit.sha, subject: commit.subject, files }))

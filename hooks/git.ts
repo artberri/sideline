@@ -1,4 +1,4 @@
-import type { EngineInterface } from 'claude-code'
+import type { ProcessRunResult } from 'claude-code'
 
 import type { BranchStatus, ChangedFile, Commit, FileStatus, LineCounts, Snapshot } from '../types'
 
@@ -6,11 +6,13 @@ type RepoSnapshot = Extract<Snapshot, { kind: 'repo' }>
 
 const UNTRACKED_COUNT_LIMIT = 60
 
-export function git($: EngineInterface, cwd: string, args: string[]) {
-	return $.process.run(['git', '--no-optional-locks', '-C', cwd, ...args], {
-		timeoutMs: 10_000,
-		env: { GIT_OPTIONAL_LOCKS: '0' },
-	})
+// What the readers need from the engine. register.tsx builds it: the directory reads a mod's engine calls only in the
+// file that declares its hooks.
+export type Git = {
+	// Runs git with these arguments in a folder.
+	run: (cwd: string, args: string[]) => Promise<ProcessRunResult>
+	// A file's size and modification time, or null for a file gone or a host without one.
+	stat: (path: string) => Promise<{ size: number; mtimeMs: number } | null>
 }
 
 const emptyStatus = (): BranchStatus => ({
@@ -117,18 +119,18 @@ export function parseNumstat(stdout: string): Map<string, LineCounts> {
 // `git diff --no-index` again only for a file that changed. It starts empty on a reload.
 const untrackedCache = new Map<string, { size: number; mtimeMs: number; counts: LineCounts | undefined }>()
 
-async function untrackedCounts($: EngineInterface, cwd: string, files: ChangedFile[]) {
+async function untrackedCounts(git: Git, cwd: string, files: ChangedFile[]) {
 	const counts = new Map<string, LineCounts>()
 	const seen = new Set<string>()
 	for (const file of files.filter((f) => f.isUntracked).slice(0, UNTRACKED_COUNT_LIMIT)) {
 		const path = `${cwd}/${file.path}`
 		seen.add(path)
 		// Without a stat (a file gone between status and now, a host without one) the file is read every time.
-		const stat = await $.fs.stat(path).catch(() => null)
+		const stat = await git.stat(path)
 		const cached = untrackedCache.get(path)
 		let one = cached?.counts
 		if (!stat || !cached || cached.size !== stat.size || cached.mtimeMs !== stat.mtimeMs) {
-			const run = await git($, cwd, ['diff', '--no-index', '--numstat', '-z', '--', '/dev/null', file.path])
+			const run = await git.run(cwd, ['diff', '--no-index', '--numstat', '-z', '--', '/dev/null', file.path])
 			one = parseNumstat(run.stdout).get(file.path)
 			if (stat) untrackedCache.set(path, { size: stat.size, mtimeMs: stat.mtimeMs, counts: one })
 		}
@@ -172,10 +174,10 @@ const NAME_STATUS: Record<string, FileStatus> = { A: 'added', D: 'deleted', R: '
 const COMMIT_DIFF = ['-r', '--root', '--no-commit-id', '-m', '--first-parent']
 
 // The files a commit changed, with their status and line counts, as the tree draws them.
-export async function readCommitFiles($: EngineInterface, root: string, sha: string): Promise<ChangedFile[]> {
-	const counts = parseNumstat((await git($, root, ['diff-tree', ...COMMIT_DIFF, '--numstat', '-z', sha])).stdout)
+export async function readCommitFiles(git: Git, root: string, sha: string): Promise<ChangedFile[]> {
+	const counts = parseNumstat((await git.run(root, ['diff-tree', ...COMMIT_DIFF, '--numstat', '-z', sha])).stdout)
 	const statuses = parseNameStatus(
-		(await git($, root, ['diff-tree', ...COMMIT_DIFF, '--name-status', '-z', sha])).stdout,
+		(await git.run(root, ['diff-tree', ...COMMIT_DIFF, '--name-status', '-z', sha])).stdout,
 	)
 	return [...statuses].map(([path, status]) => ({
 		path,
@@ -186,25 +188,25 @@ export async function readCommitFiles($: EngineInterface, root: string, sha: str
 }
 
 // One file's diff in a commit, against its first parent.
-export async function readCommitDiff($: EngineInterface, root: string, sha: string, path: string): Promise<string> {
-	return hunksOnly((await git($, root, ['show', '--format=', '-m', '--first-parent', sha, '--', path])).stdout)
+export async function readCommitDiff(git: Git, root: string, sha: string, path: string): Promise<string> {
+	return hunksOnly((await git.run(root, ['show', '--format=', '-m', '--first-parent', sha, '--', path])).stdout)
 }
 
-export async function readSnapshot($: EngineInterface, cwd: string): Promise<Snapshot> {
-	const run = await git($, cwd, ['status', '--porcelain=v2', '--branch', '-z', '--untracked-files=all'])
+export async function readSnapshot(git: Git, cwd: string): Promise<Snapshot> {
+	const run = await git.run(cwd, ['status', '--porcelain=v2', '--branch', '-z', '--untracked-files=all'])
 	if (run.exitCode !== 0) return { kind: 'none' }
 	const snapshot = parseStatus(run.stdout)
-	const top = await git($, cwd, ['rev-parse', '--show-toplevel'])
+	const top = await git.run(cwd, ['rev-parse', '--show-toplevel'])
 	snapshot.root = top.stdout.trim()
-	const stash = await git($, cwd, ['rev-parse', '--verify', '--quiet', 'refs/stash'])
+	const stash = await git.run(cwd, ['rev-parse', '--verify', '--quiet', 'refs/stash'])
 	snapshot.status.stashed = stash.exitCode === 0
-	const tracked = await git($, cwd, ['diff', 'HEAD', '--numstat', '-z'])
+	const tracked = await git.run(cwd, ['diff', 'HEAD', '--numstat', '-z'])
 	const counts = tracked.exitCode === 0 ? parseNumstat(tracked.stdout) : new Map<string, LineCounts>()
-	for (const [path, one] of await untrackedCounts($, cwd, snapshot.files)) counts.set(path, one)
+	for (const [path, one] of await untrackedCounts(git, cwd, snapshot.files)) counts.set(path, one)
 	snapshot.files = snapshot.files.map((file) => ({ ...file, ...counts.get(file.path) }))
 	if (snapshot.files.length === 0) {
 		// A repo with no commits yet fails `git log`; that is an empty list too.
-		const log = await git($, cwd, ['log', `-n${LOG_LIMIT}`, '--format=%h%x00%s%x00%ct%x00'])
+		const log = await git.run(cwd, ['log', `-n${LOG_LIMIT}`, '--format=%h%x00%s%x00%ct%x00'])
 		snapshot.commits = log.exitCode === 0 ? parseLog(log.stdout) : []
 	}
 	return snapshot
@@ -216,10 +218,10 @@ export function hunksOnly(diff: string): string {
 	return start > 0 || diff.startsWith('@@') ? diff.slice(start) : ''
 }
 
-export async function readDiff($: EngineInterface, root: string, file: ChangedFile): Promise<string> {
+export async function readDiff(git: Git, root: string, file: ChangedFile): Promise<string> {
 	const args = file.isUntracked
 		? ['diff', '--no-index', '--', '/dev/null', file.path]
 		: ['diff', 'HEAD', '--', file.path]
-	const run = await git($, root, args)
+	const run = await git.run(root, args)
 	return hunksOnly(run.stdout)
 }

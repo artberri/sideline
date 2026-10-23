@@ -1,5 +1,3 @@
-import type { EngineInterface } from 'claude-code'
-
 import type { BranchStatus, Glyphs } from '../types'
 
 export const BRANCH_ICON: Record<Glyphs, string> = { nerd: '\u{e0a0}', plain: '⎇' }
@@ -21,30 +19,12 @@ export function statusSymbols(s: BranchStatus): string {
 	return all + aheadBehind
 }
 
-const NERD_FONT_CHECK =
+export const NERD_FONT_CHECK =
 	'if command -v fc-list >/dev/null 2>&1 && [ -n "$(fc-list ":charset=e0a0" file | grep -vi lastresort | head -n1)" ]; then echo nerd; exit 0; fi; ' +
 	'ls "$HOME"/Library/Fonts/*Nerd* /Library/Fonts/*Nerd* >/dev/null 2>&1 && echo nerd || echo plain'
 
-export async function resolveGlyphs($: EngineInterface, option: unknown): Promise<Glyphs> {
-	if (option === 'nerd' || option === 'plain') return option
-	try {
-		const run = await $.process.run(['sh', '-c', NERD_FONT_CHECK], { timeoutMs: 5_000 })
-		return run.stdout.trim() === 'nerd' ? 'nerd' : 'plain'
-	} catch {
-		return 'plain'
-	}
-}
-
 // The dot Claude Code puts before a row: ⏺ on macOS, ● elsewhere. A row sideline draws in place of the engine's uses it.
 export const rowDotFor = (system: string) => (system.trim() === 'Darwin' ? '⏺' : '●')
-
-export async function resolveRowDot($: EngineInterface): Promise<string> {
-	try {
-		return rowDotFor((await $.process.run(['uname', '-s'], { timeoutMs: 5_000 })).stdout)
-	} catch {
-		return rowDotFor('')
-	}
-}
 
 const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i
 
