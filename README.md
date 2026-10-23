@@ -98,6 +98,20 @@ count lines) is display only: the full command is in the `COMMANDS` box, permiss
 ctrl+o shows everything, and the `transcriptCommands` and `transcriptDiffs` options turn the hiding off.
 `claude plugin validate .` prints exactly what it hooks and calls.
 
+### What it sends
+
+Nothing, to anywhere. Its only way out of Claude Code is `$.process.run`, and it runs just these fixed, local
+commands, none of which reaches the network:
+
+- `git` with the read-only subcommands above, in your repo, to draw the changes, diffs and commits;
+- `uname -s`, once per session, to draw Claude Code's own row dot (`⏺` on macOS, `●` elsewhere);
+- a fixed `sh -c` script, once per session with `glyphs` on `auto`, that runs `fc-list` or lists the macOS Fonts
+  folders and prints `nerd` or `plain`.
+
+What `stat` reads, an untracked file's size and modification time, only decides whether `git` counts that file's lines
+again; it goes into no command and is kept only for the session. Everything these commands print is drawn in the pane
+and nowhere else.
+
 ## Troubleshooting
 
 **The pane doesn't appear.** Check `claude --version` is 2.1.308 or later, then run `/reload-plugins` and `/sideline`.
