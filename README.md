@@ -103,10 +103,31 @@ ctrl+o shows everything, and the `transcriptCommands` and `transcriptDiffs` opti
 Nothing, to anywhere. Its only way out of Claude Code is `$.process.run`, and it runs just these fixed, local
 commands, none of which reaches the network:
 
-- `git` with the read-only subcommands above, in your repo, to draw the changes, diffs and commits;
+- `git`, read-only, to draw the changes, diffs and commits (the full list is below);
 - `uname -s`, once per session, to draw Claude Code's own row dot (`⏺` on macOS, `●` elsewhere);
 - a fixed `sh -c` script, once per session with `glyphs` on `auto`, that runs `fc-list` or lists the macOS Fonts
   folders and prints `nerd` or `plain`.
+
+Each `git` command starts `git --no-optional-locks -C <folder>`, runs with `GIT_OPTIONAL_LOCKS=0` and a 10-second
+timeout, and is one of these:
+
+```sh
+status --porcelain=v2 --branch -z --untracked-files=all       # the changed files and the branch
+rev-parse --show-toplevel                                      # the repo's root
+rev-parse --verify --quiet refs/stash                          # whether there is a stash
+diff HEAD --numstat -z                                         # tracked files' line counts
+diff --no-index --numstat -z -- /dev/null <untracked file>     # an untracked file's line counts
+log -n50 --format=%h%x00%s%x00%ct%x00                          # the recent commits, with nothing changed
+diff HEAD -- <file>                                            # a changed file's diff
+diff --no-index -- /dev/null <untracked file>                  # an untracked file's diff
+diff-tree -r --root --no-commit-id -m --first-parent --numstat -z <commit>      # a commit's line counts
+diff-tree -r --root --no-commit-id -m --first-parent --name-status -z <commit>  # a commit's files
+show --format= -m --first-parent <commit> -- <file>            # a file's diff in a commit
+```
+
+`<folder>` is the session's working folder or its repo's root; `<file>` and `<untracked file>` are paths `git status`
+(or, in a commit, `diff-tree`) listed; `<commit>` is a hash `git log` listed. Nothing you or Claude type goes into a
+command.
 
 What `stat` reads, an untracked file's size and modification time, only decides whether `git` counts that file's lines
 again; it goes into no command and is kept only for the session. Everything these commands print is drawn in the pane
