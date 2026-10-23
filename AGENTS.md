@@ -37,6 +37,7 @@ tests/*.test.ts(x)           claude plugin test suites
 .claude/skills/              create-plan and execute-plan
 CONTRIBUTING.md              for contributors: setup, checks, tests, commits, pull requests
 CODE_OF_CONDUCT.md           Contributor Covenant 2.0
+CHANGELOG.md                 Keep a Changelog: a line under Unreleased for each user-facing change
 ```
 
 ## Running it
