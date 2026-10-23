@@ -24,7 +24,15 @@ import { cutDiff, drawDiff, drawRows } from './rows'
 import type { RowSpec } from './rows'
 import { fitSubject, shortAge } from './commits'
 import { bashChangedFiles, countsLabel, fileRow, summarize } from './summary'
-import { BRANCH_ICON, backgroundOption, NERD_FONT_CHECK, lighten, rowDotFor, statusSymbols } from './symbols'
+import {
+	BRANCH_ICON,
+	backgroundOption,
+	hasNerdFont,
+	isNerdFontFile,
+	lighten,
+	rowDotFor,
+	statusSymbols,
+} from './symbols'
 import { resolveCursor, treeRows } from './tree'
 import {
 	SESSION_ROWS,
@@ -145,11 +153,21 @@ function gitFor($: EngineInterface): Git {
 async function resolveGlyphs($: EngineInterface, option: unknown): Promise<Glyphs> {
 	if (option === 'nerd' || option === 'plain') return option
 	try {
-		const run = await $.process.run(['sh', '-c', NERD_FONT_CHECK], { timeoutMs: 5_000 })
-		return run.stdout.trim() === 'nerd' ? 'nerd' : 'plain'
+		const run = await $.process.run(['fc-list', ':charset=e0a0', 'file'], { timeoutMs: 5_000 })
+		if (hasNerdFont(run.stdout)) return 'nerd'
 	} catch {
-		return 'plain'
+		// No fc-list, as on a stock macOS: the Fonts folders decide.
 	}
+	const home = await $.env.get('HOME')
+	for (const folder of [`${home}/Library/Fonts`, '/Library/Fonts']) {
+		try {
+			const entries = await $.fs.list(folder)
+			if (entries.some((entry) => isNerdFontFile(entry.name))) return 'nerd'
+		} catch {
+			// A folder that isn't there (not macOS, or no fonts installed for the user).
+		}
+	}
+	return 'plain'
 }
 
 async function resolveRowDot($: EngineInterface): Promise<string> {

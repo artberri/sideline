@@ -105,8 +105,10 @@ commands, none of which reaches the network:
 
 - `git`, read-only, to draw the changes, diffs and commits (the full list is below);
 - `uname -s`, once per session, to draw Claude Code's own row dot (`⏺` on macOS, `●` elsewhere);
-- a fixed `sh -c` script, once per session with `glyphs` on `auto`, that runs `fc-list` or lists the macOS Fonts
-  folders and prints `nerd` or `plain`.
+- `fc-list :charset=e0a0 file`, once per session with `glyphs` on `auto`, to find a Nerd Font. Without `fc-list`, as on
+  a stock macOS, it reads the file names in `$HOME/Library/Fonts` and `/Library/Fonts` instead (`$.fs.list`).
+
+It runs no shell.
 
 Each `git` command starts `git --no-optional-locks -C <folder>`, runs with `GIT_OPTIONAL_LOCKS=0` and a 10-second
 timeout, and is one of these:

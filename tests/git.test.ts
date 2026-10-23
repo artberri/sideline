@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 
 import { fitSubject, shortAge } from '../hooks/commits'
 import { parseLog, parseNameStatus, parseNumstat, parseStatus } from '../hooks/git'
-import { lighten, rowDotFor, statusSymbols } from '../hooks/symbols'
+import { hasNerdFont, isNerdFontFile, lighten, rowDotFor, statusSymbols } from '../hooks/symbols'
 
 const NUL = '\0'
 
@@ -110,6 +110,14 @@ test('parseNumstat reads counts, renames, binaries and --no-index output', () =>
 test('lighten mixes a little white into a background color', () => {
 	expect(lighten('#1e1e3f')).toBe('#393956')
 	expect(lighten('#000')).toBe('#1f1f1f')
+})
+
+test('a Nerd Font is found by fc-list, LastResort aside, or by its file name', () => {
+	expect(hasNerdFont('/Users/me/Library/Fonts/JetBrainsMonoNerdFont-Regular.ttf\n')).toBe(true)
+	expect(hasNerdFont('/System/Library/Fonts/LastResort.otf\n')).toBe(false)
+	expect(hasNerdFont('')).toBe(false)
+	expect(isNerdFontFile('FiraCodeNerdFontMono-Bold.ttf')).toBe(true)
+	expect(isNerdFontFile('FiraCode-Bold.ttf')).toBe(false)
 })
 
 test('rowDotFor matches Claude Code: ⏺ on macOS, ● elsewhere', () => {

@@ -19,9 +19,13 @@ export function statusSymbols(s: BranchStatus): string {
 	return all + aheadBehind
 }
 
-export const NERD_FONT_CHECK =
-	'if command -v fc-list >/dev/null 2>&1 && [ -n "$(fc-list ":charset=e0a0" file | grep -vi lastresort | head -n1)" ]; then echo nerd; exit 0; fi; ' +
-	'ls "$HOME"/Library/Fonts/*Nerd* /Library/Fonts/*Nerd* >/dev/null 2>&1 && echo nerd || echo plain'
+// `fc-list :charset=e0a0 file` lists the font files with the branch glyph, which every Nerd Font has; macOS's
+// LastResort font claims every code point, so it doesn't count.
+export const hasNerdFont = (fcList: string) =>
+	fcList.split('\n').some((line) => line.trim() !== '' && !/lastresort/i.test(line))
+
+// A Nerd Font's file name says so: `JetBrainsMonoNerdFont-Regular.ttf`.
+export const isNerdFontFile = (name: string) => name.includes('Nerd')
 
 // The dot Claude Code puts before a row: ⏺ on macOS, ● elsewhere. A row sideline draws in place of the engine's uses it.
 export const rowDotFor = (system: string) => (system.trim() === 'Darwin' ? '⏺' : '●')

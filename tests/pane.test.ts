@@ -10,6 +10,8 @@ type World = {
 	untracked?: Record<string, string>
 	hasStash?: boolean
 	hasNerdFont?: boolean
+	// The font files in the macOS Fonts folders, for a machine without fc-list.
+	fontFiles?: string[]
 	tool?: () => unknown
 	diffs?: Record<string, string>
 	ran?: string[][]
@@ -82,7 +84,7 @@ function world(on: On, w: World, opens: string[]) {
 	}))
 	on('process.run', (_, e) => {
 		const argv = [...e.argv]
-		if (argv[0] === 'sh') return done(0, w.hasNerdFont ? 'nerd\n' : 'plain\n')
+		if (argv[0] === 'fc-list') return done(0, w.hasNerdFont ? '/fonts/HackNerdFont-Regular.ttf\n' : '')
 		if (argv.includes('status')) return w.status === undefined ? done(128) : done(0, w.status)
 		if (argv.includes('refs/stash')) return done(w.hasStash ? 0 : 1)
 		if (argv.includes('--show-toplevel')) return done(0, '/repo\n')
@@ -96,6 +98,10 @@ function world(on: On, w: World, opens: string[]) {
 		if (argv.includes('diff')) return done(0, w.numstat ?? '')
 		return done(0)
 	})
+	on('env.get', () => ({ value: '/home/someone' }))
+	on('fs.list', () => ({
+		value: (w.fontFiles ?? []).map((name) => ({ name, kind: 'file' as const, size: 0, mtimeMs: 0, isLink: false })),
+	}))
 	on('tool.call', () => (w.tool?.() ?? { result: {} }) as { result: Record<string, never> })
 	on('turn.start', (_, e) => ({ turnId: e.turnId }))
 	on('turn.complete', () => ({ text: '' }))
@@ -169,6 +175,18 @@ test('glyphs: auto uses the Nerd Font branch icon when one is installed', async 
 	world(on, { status: STATUS, hasNerdFont: true }, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 	expect(await drawn($, 'terminal')).toContain('\u{e0a0} main')
+})
+
+test('glyphs: auto finds a Nerd Font in the macOS Fonts folders without fc-list', async ($, on) => {
+	world(on, { status: STATUS, fontFiles: ['JetBrainsMonoNerdFont-Regular.ttf'] }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	expect(await drawn($, 'terminal')).toContain('\u{e0a0} main')
+})
+
+test('glyphs: auto draws the plain icon with no Nerd Font', async ($, on) => {
+	world(on, { status: STATUS, fontFiles: ['Menlo.ttc'] }, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	expect(await drawn($, 'terminal')).toContain('⎇ main')
 })
 
 test('glyphs: plain forces the plain icon', { options: { glyphs: 'plain' } }, async ($, on) => {
