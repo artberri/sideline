@@ -2,8 +2,8 @@ import type { BranchStatus, Glyphs } from '../types'
 
 export const BRANCH_ICON: Record<Glyphs, string> = { nerd: '\u{e0a0}', plain: '⎇' }
 
-// Starship's git_status defaults, in its `$all_status$ahead_behind` order, except that diverged also shows both
-// counts (the common `diverged = '⇕⇡${ahead_count}⇣${behind_count}'` override) instead of a bare `⇕`.
+// Starship's git_status defaults, in its order (every status symbol, then ahead and behind), except that diverged also
+// shows both counts, `⇕⇡2⇣1` (a common override), instead of a bare `⇕`.
 export function statusSymbols(s: BranchStatus): string {
 	const all = [
 		s.conflicted ? '=' : '',
