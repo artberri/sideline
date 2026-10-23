@@ -133,6 +133,34 @@ command), then assert on what the hooks draw or store; `tests/pane.test.ts` is t
 - Keep `bun run check` green in every commit.
 - Never commit secrets, tokens, local paths or anything personal; check the diff before you push.
 
+## Releasing
+
+sideline is installed from the [artberri marketplace](https://github.com/artberri/claude-plugins), which points at this
+repository's default branch. Claude Code decides what to hand out by the `version` in
+[`.claude-plugin/plugin.json`](.claude-plugin/plugin.json):
+
+- **A new install** gets whatever is on `main` at that moment, so keep `main` working.
+- **An existing install** gets a new copy only when `version` changes: when the user updates (`claude plugin update
+  sideline@artberri`), or on their next session start if they turned on auto-update for the marketplace. Commits pushed
+  without a version change don't reach them.
+
+To release (maintainers):
+
+1. Make sure `bun run check` is green on `main`.
+2. Bump `version` in `.claude-plugin/plugin.json` ([Semantic Versioning](https://semver.org): a fix bumps the patch, a
+   new feature or option the minor, a change that breaks an option or a setting the major).
+3. Commit it alone as `chore: release <version>`, tag that commit `v<version>`, and push both:
+
+    ```sh
+    git tag -s v0.2.0 -m "sideline 0.2.0"
+    git push origin main v0.2.0
+    ```
+
+4. Write the release notes on GitHub from the conventional commits since the last tag.
+
+Keep `version` only in `plugin.json`: the marketplace entry has none, and setting it in both makes Claude Code use
+`plugin.json`'s without a word.
+
 ## Plans
 
 Changes of more than one step are planned in `.agents/plans/` before they are built: the behaviour as rules a test or a
