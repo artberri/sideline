@@ -1112,6 +1112,18 @@ test('before any reading the usage line reads —', async ($, on) => {
 	expect(text).toContain(' · 5h ')
 })
 
+test('/compact resets the context bar though the engine still has the old reading', async ($, on) => {
+	world(on, { status: STATUS }, [])
+	on('session.usage', () => ({ value: { startedAt: 0, ...USAGE(84, 23, 13) } }))
+	on('command.run', { command: 'compact' }, () => ({ text: 'Compacted' }))
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	expect((await sessionBox($)).text).toContain('84%')
+	await $.command.run({ ...sideline(), command: 'compact' })
+	const text = (await sessionBox($)).text
+	expect(text).toContain('▱▱▱ —')
+	expect(text).toContain('23%')
+})
+
 test('an untracked file is counted again only after its size or modification time changes', async ($, on) => {
 	const ran: string[][] = []
 	const w: World = {

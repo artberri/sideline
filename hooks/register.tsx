@@ -577,6 +577,12 @@ export const register: Register = (on, options) => {
 		return next(e)
 	})
 
+	// /compact resets the context bar to `—`: the engine keeps the old reading until the next response.
+	on('command.run', { command: 'compact' }, async ($, e, next) => {
+		await update($, session, (info) => (info.context === null ? info : { ...info, context: null }))
+		return next(e)
+	})
+
 	// The main loop's model and effort as each of its requests goes out: /model and /effort show from the next one.
 	// Context and rate-limit readings arrive pushed, after each main turn and as a window moves a point.
 	on('session.measure', async ($, e, next) => {

@@ -23,8 +23,8 @@ The first release.
 
 - A `SIDELINE · IDLE / WORKING / WAITING` title, `WAITING` while a question or a plan waits for an answer, and the key
   hints under it.
-- `SESSION`: the branch with Starship-style git status symbols, the model and effort, a context bar, and the 5-hour and
-  7-day usage. The `sessionBox` option hides it.
+- `SESSION`: the branch with Starship-style git status symbols, the model and effort, a context bar that `/compact`
+  resets, and the 5-hour and 7-day usage. The `sessionBox` option hides it.
 - `CHANGES`: the changed files as a tree with `+N -N` counts and file icons, a shimmer on the file Claude is editing,
   and each file's diff on a click or `l`. It scrolls on its own, with the wheel, the keys and a `↑ ↓` count on its
   border.
