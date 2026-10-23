@@ -27,6 +27,7 @@ an agent working in the repo.
 plugin/                             the mod: the only folder users install (a git-subdir source) and the directory reads
 plugin/.claude-plugin/plugin.json   manifest: name, version, userConfig options, types contract
 plugin/.claude-plugin/types/        typings Claude Code generates on every load (gitignored)
+plugin/.claude-plugin/icon.png      the directory listing's icon, rendered from assets/icon.svg
 plugin/hooks/hooks.json             lists the hooks module
 plugin/hooks/register.tsx           export const register: Register: the hooks, every engine call, the pane render
 plugin/hooks/*.ts(x)                pure helpers: git (parsers, readers over a Git), tree, rows (the Client), window
@@ -38,6 +39,7 @@ plugin/LICENSE                      a copy of LICENSE, so the installed plugin c
 .agents/plans/                      implementation plans; finished ones in done/
 .agents/follow-ups.md               follow-ups and ideas not planned yet
 .claude/skills/                     create-plan and execute-plan
+assets/icon.svg                     the icon's source; the render command is in the file
 demo/                               the README's GIF and the VHS tape that records it
 CONTRIBUTING.md                     for contributors: setup, checks, tests, commits, pull requests
 CODE_OF_CONDUCT.md                  Contributor Covenant 2.0

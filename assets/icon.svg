@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+	<!-- The plugin icon. Render it into the plugin from the repository root with:
+	     rsvg-convert -w 1024 -h 1024 assets/icon.svg -o plugin/.claude-plugin/icon.png
+	     The directory takes the icon only once, the first time the plugin is saved in its portal. -->
+	<rect width="1024" height="1024" fill="#1b1b26"/>
+	<!-- The conversation, tidy: two lines and one folded edit with its count -->
+	<rect x="150" y="300" width="330" height="76" rx="38" fill="#6a6a84"/>
+	<rect x="150" y="474" width="170" height="76" rx="38" fill="#6a6a84"/>
+	<rect x="350" y="474" width="130" height="76" rx="38" fill="#7fc58c"/>
+	<rect x="150" y="648" width="260" height="76" rx="38" fill="#6a6a84"/>
+	<!-- The sideline -->
+	<rect x="562" y="178" width="334" height="668" rx="72" fill="#d97757"/>
+	<rect x="642" y="320" width="174" height="64" rx="32" fill="#1b1b26"/>
+	<rect x="642" y="460" width="130" height="64" rx="32" fill="#1b1b26"/>
+	<rect x="642" y="600" width="174" height="64" rx="32" fill="#1b1b26"/>
+</svg>
