@@ -162,10 +162,10 @@ async function resolveRowDot($: EngineInterface): Promise<string> {
 }
 
 async function readAndStore($: EngineInterface): Promise<void> {
-	const next = await readSnapshot(gitFor($), await $.session.cwd())
+	const fresh = await readSnapshot(gitFor($), await $.session.cwd())
 	const current = await read($, snapshot)
-	if (JSON.stringify(current) !== JSON.stringify(next)) await update($, snapshot, () => next)
-	await readSelectedDiff($, next)
+	if (JSON.stringify(current) !== JSON.stringify(fresh)) await update($, snapshot, () => fresh)
+	await readSelectedDiff($, fresh)
 }
 
 async function closeDiff($: EngineInterface): Promise<void> {
@@ -188,9 +188,9 @@ async function readSelectedDiff($: EngineInterface, shown: Snapshot): Promise<vo
 	const hunks = commit
 		? await readCommitDiff(gitFor($), shown.root, commit.sha, path)
 		: await readDiff(gitFor($), shown.root, file)
-	const next: FileDiff = { path, hunks }
+	const fresh: FileDiff = { path, hunks }
 	const current = await read($, diff)
-	if (JSON.stringify(current) !== JSON.stringify(next)) await update($, diff, () => next)
+	if (JSON.stringify(current) !== JSON.stringify(fresh)) await update($, diff, () => fresh)
 }
 
 // The poll and tool calls overlap; one read runs at a time, and a request during it runs once more afterwards.
@@ -211,9 +211,9 @@ function refresh($: EngineInterface): Promise<void> {
 	return refreshing
 }
 
-function editedPath(e: { tool: string } & Record<string, unknown>): string | undefined {
-	if (e.tool === 'NotebookEdit' && typeof e.notebook_path === 'string') return e.notebook_path
-	if ((e.tool === 'Edit' || e.tool === 'Write') && typeof e.file_path === 'string') return e.file_path
+function editedPath(call: { tool: string } & Record<string, unknown>): string | undefined {
+	if (call.tool === 'NotebookEdit' && typeof call.notebook_path === 'string') return call.notebook_path
+	if ((call.tool === 'Edit' || call.tool === 'Write') && typeof call.file_path === 'string') return call.file_path
 	return undefined
 }
 
@@ -483,23 +483,23 @@ type NotedCall =
 	| { kind: 'edit'; edit: ActiveEdit; startedAt: number }
 	| { kind: 'other' }
 
-async function noteCallStart($: EngineInterface, e: ToolCallInput): Promise<NotedCall> {
+async function noteCallStart($: EngineInterface, call: ToolCallInput): Promise<NotedCall> {
 	// A question or a plan to approve keeps its call open exactly as long as its dialog waits for the person.
-	if (DIALOG_TOOLS.has(String(e.tool)) && e.agentId === undefined) {
+	if (DIALOG_TOOLS.has(String(call.tool)) && call.agentId === undefined) {
 		await update($, turn, () => 'waiting')
 		return { kind: 'dialog' }
 	}
-	const path = editedPath(e)
+	const path = editedPath(call)
 	if (path) {
 		const startedAt = await $.clock.now()
-		const edit: ActiveEdit = { id: e.tool_use_id, path, state: 'running', isNewFile: e.tool === 'Write' }
+		const edit: ActiveEdit = { id: call.tool_use_id, path, state: 'running', isNewFile: call.tool === 'Write' }
 		await update($, edits, (list) => [...list.filter((one) => one.path !== path), edit])
 		return { kind: 'edit', edit, startedAt }
 	}
-	if (e.tool === 'Bash') {
-		const id = e.tool_use_id
+	if (call.tool === 'Bash') {
+		const id = call.tool_use_id
 		await update($, commands, (list) =>
-			[...list, { id, command: e.command, state: 'running' as const }].slice(-LOG_SIZE),
+			[...list, { id, command: call.command, state: 'running' as const }].slice(-LOG_SIZE),
 		)
 		const kept = new Set((await read($, commands)).map((one) => one.id))
 		await update($, openCommand, (open) => (open !== null && kept.has(open) ? open : null))
@@ -511,7 +511,7 @@ async function noteCallStart($: EngineInterface, e: ToolCallInput): Promise<Note
 // `result` is null when the call threw.
 async function noteCallEnd(
 	$: EngineInterface,
-	e: ToolCallInput,
+	call: ToolCallInput,
 	noted: NotedCall | undefined,
 	result: ToolCallResult | null,
 ): Promise<void> {
@@ -531,17 +531,17 @@ async function noteCallEnd(
 		const isInterrupted =
 			typeof output === 'object' && output !== null && 'interrupted' in output && output.interrupted === true
 		const state: LoggedCommand['state'] = isFailed || isInterrupted ? 'failed' : 'done'
-		await update($, commands, (list) => list.map((one) => (one.id === e.tool_use_id ? { ...one, state } : one)))
+		await update($, commands, (list) => list.map((one) => (one.id === call.tool_use_id ? { ...one, state } : one)))
 	}
-	if (result && e.tool === 'Bash' && !isFailed) {
+	if (result && call.tool === 'Bash' && !isFailed) {
 		const startedAt = await $.clock.now()
 		for (const file of bashChangedFiles(result.result)) {
-			const edit: ActiveEdit = { id: `${e.tool_use_id}:${file.path}`, state: 'running', ...file }
+			const edit: ActiveEdit = { id: `${call.tool_use_id}:${file.path}`, state: 'running', ...file }
 			await update($, edits, (list) => [...list.filter((one) => one.path !== file.path), edit])
 			await finishEdit($, edit.id, startedAt)
 		}
 	}
-	if (REFRESH_AFTER.has(String(e.tool))) void refresh($)
+	if (REFRESH_AFTER.has(String(call.tool))) void refresh($)
 }
 
 export const register: Register = (on, options) => {
