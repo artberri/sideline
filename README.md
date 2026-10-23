@@ -129,6 +129,11 @@ show --format= -m --first-parent <commit> -- <file>            # a file's diff i
 (or, in a commit, `diff-tree`) listed; `<commit>` is a hash `git log` listed. Nothing you or Claude type goes into a
 command.
 
+From the conversation it reads only what the table above lists: `turn.step` gives it the model and effort of each
+main request, never the messages, and `tool.call` gives it each tool call's name, input and outcome, which it draws in
+the pane (a shell command in `COMMANDS`, an edited file's shimmer in `CHANGES`). None of it goes into a command or
+leaves Claude Code.
+
 What `stat` reads, an untracked file's size and modification time, only decides whether `git` counts that file's lines
 again; it goes into no command and is kept only for the session. Everything these commands print is drawn in the pane
 and nowhere else.
