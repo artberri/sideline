@@ -37,5 +37,10 @@ here (or move it into the plan) once it is planned.
 - **Read highlights:** show the files Claude reads, not only the ones it edits. _Left out of the changed-files pane
   plan._
 - **Git action animations** for commits, pushes and checkouts in the header. _Left out of the changed-files pane plan._
+- **Install from Anthropic's directory in the README**, if the listing is approved and you want it there: the directory
+  as an install option (add it on claude.ai, where it syncs into Claude Code as `sideline@synced`, or
+  `claude plugin install sideline@claude-community` after adding `anthropics/claude-plugins-community`), maybe first,
+  with the artberri marketplace kept as the alternative. Only once it's live, with the real listing URL and name. _From:
+  submitting to the directory._
 - **Diff against the branch's merge-base** (everything on the branch, like a PR) as an option next to `HEAD`. _From:
   the changed-files pane plan's decisions._
