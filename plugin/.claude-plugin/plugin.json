@@ -6,6 +6,9 @@
 		"name": "Alberto Varela Sánchez",
 		"email": "hello@albertovarela.net"
 	},
+	"homepage": "https://github.com/artberri/sideline#readme",
+	"repository": "https://github.com/artberri/sideline",
+	"documentationUrl": "https://github.com/artberri/sideline/blob/main/plugin/README.md",
 	"license": "MIT",
 	"types": "./types/index.d.ts",
 	"userConfig": {
