@@ -166,6 +166,9 @@ To release (maintainers):
 6. In the [marketplace repository](https://github.com/artberri/claude-plugins), move sideline's `ref` to the new tag,
    run `claude plugin validate .`, commit as `feat: release sideline <version>` and push. This is the step that hands
    the release out.
+7. In Anthropic's [developer portal](https://claude.ai/directory/manage), open sideline, and on its **Settings** tab
+   change **Tracked branch or tag** to the new tag. The directory follows a tag, not `main`, so it sees no new version
+   until you do. Once the scan passes, select **Publish update** on the plugin's page.
 
 Keep `version` only in `plugin.json`: the marketplace entry has none, and setting it in both makes Claude Code use
 `plugin.json`'s without a word.
