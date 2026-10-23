@@ -1,6 +1,6 @@
 # The demo GIF
 
-`demo/sideline.gif`, at the top of the main README, is recorded with [VHS](https://github.com/charmbracelet/vhs) from
+The GIF at the top of the main README is recorded with [VHS](https://github.com/charmbracelet/vhs) from
 [`demo.tape`](demo.tape): Claude adds a function and its test to a throwaway repo while the pane follows along.
 
 ```sh
