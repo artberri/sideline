@@ -145,6 +145,10 @@ It reads two things from your disk besides `git`'s output, and neither goes into
 
 Everything these commands print is drawn in the pane and nowhere else.
 
+It reads no credential: no token, API key, login or key file. The only environment variable it reads is `HOME`, to
+find `$HOME/Library/Fonts`. The 5-hour and 7-day usage come from Claude Code itself through `$.session.usage()`; the
+mod never sees the account or the credential behind them.
+
 ## Troubleshooting
 
 **The pane doesn't appear.** Check `claude --version` is 2.1.308 or later, then run `/reload-plugins` and `/sideline`.
