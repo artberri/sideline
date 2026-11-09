@@ -1,6 +1,6 @@
 {
 	"name": "sideline",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "Declutters Claude Code's conversation: long commands, diffs and tool chatter step aside into a tidy pane with your changes, commits and commands.",
 	"author": {
 		"name": "Alberto Varela Sánchez",

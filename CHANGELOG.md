@@ -5,6 +5,8 @@ and versions follow [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-09
+
 ### Added
 
 - A command opened from `COMMANDS` shows what it printed under it: its output dimmed, or a failed command's error
@@ -43,5 +45,6 @@ The first release.
 - It opens by itself in the terminal and in Claude Code Desktop; VS Code and the mobile app aren't supported yet.
 - Options: `glyphs`, `background`, `transcriptDiffs`, `transcriptCommands`, `sessionBox`, `commandRows`.
 
-[Unreleased]: https://github.com/artberri/sideline/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/artberri/sideline/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/artberri/sideline/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/artberri/sideline/releases/tag/v0.1.0
