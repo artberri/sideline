@@ -28,11 +28,11 @@ export type RowsProps = {
 
 type Local = { phase: number; hovered: number; stop?: () => void }
 
-const TICK_MS = 50
+export const TICK_MS = 50
 const BAND = 3
 
 // A band of bright characters sweeps across the name; the rest stays dim, both in Claude's own accent color.
-function isInBand(index: number, phase: number, length: number): boolean {
+export function isInBand(index: number, phase: number, length: number): boolean {
 	const position = (phase % (length + BAND * 2)) - BAND
 	return Math.abs(index - position) < BAND / 2 + 0.5
 }

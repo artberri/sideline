@@ -5,6 +5,11 @@ and versions follow [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
 
+### Added
+
+- A command opened from `COMMANDS` shows what it printed under it: its output dimmed, or a failed command's error
+  and exit code in red.
+
 ## [0.1.0] - 2026-10-23
 
 The first release.

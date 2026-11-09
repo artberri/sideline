@@ -881,6 +881,47 @@ test('pressing a log line opens the whole command in CHANGES; pressing it again,
 	await ui.unmount()
 })
 
+test('an opened command shows its stdout, then its stderr in the error color', async ($, on) => {
+	const w: World = { status: STATUS }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	w.tool = () => ({ result: { stdout: 'first\nsecond\n', stderr: 'careful', interrupted: false } })
+	await $.tool.call({ tool: 'Bash', command: 'echo hello', tool_use_id: 'toolu_out' })
+	await clock.settle()
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	await ui.press({ key: 'command-toolu_out' })
+	await clock.settle()
+	const open = JSON.stringify(await ui.find({ key: 'changes' }))
+	expect(open).toContain('$ echo hello')
+	expect(open.indexOf('first')).toBeLessThan(open.indexOf('second'))
+	expect(open.indexOf('second')).toBeLessThan(open.indexOf('careful'))
+	expect(open).toContain('"color":"subtle"')
+	expect(open).toContain('"color":"error"')
+	await ui.unmount()
+})
+
+test('an opened running command shimmers its running line, then shows its output', async ($, on) => {
+	const w: World = { status: STATUS }
+	const clock = world(on, w, [])
+	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+	const finish = held(w)
+	const call = $.tool.call({ tool: 'Bash', command: 'bun run check', tool_use_id: 'toolu_long' })
+	await clock.settle()
+	const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+	await ui.press({ key: 'command-toolu_long' })
+	await clock.settle()
+	const during = JSON.stringify(await ui.find({ key: 'changes' }))
+	expect(during).toContain('running.tsx')
+	expect(during).toContain('running…')
+	finish({ result: { stdout: '162 pass', stderr: '', interrupted: false } })
+	await call
+	await clock.settle()
+	const after = JSON.stringify(await ui.find({ key: 'changes' }))
+	expect(after).not.toContain('running.tsx')
+	expect(after).toContain('162 pass')
+	await ui.unmount()
+})
+
 test('the pane has no outer padding and fills its rows exactly', async ($, on) => {
 	world(on, { status: STATUS }, [])
 	await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })

@@ -6,8 +6,8 @@ hints over three boxes:
 - `SESSION`: the branch with starship-style git status symbols, the model and effort, the context bar and the 5-hour
   and 7-day usage.
 - `CHANGES`: the tree of changed files with line counts and a shimmer on the file Claude is editing, a file's diff, a
-  clicked command; with no changes, the recent commits, each of which opens as its own tree and diffs. It scrolls on
-  its own (wheel, keys, `↑ ↓` count on its border).
+  clicked command and its output; with no changes, the recent commits, each of which opens as its own tree and diffs.
+  It scrolls on its own (wheel, keys, `↑ ↓` count on its border).
 - `COMMANDS`: a log of the latest shell commands, `●` running, `✓` done, `✗` failed.
 
 It also tidies the transcript: a described Bash command shows its description instead of the script, an edit's diff

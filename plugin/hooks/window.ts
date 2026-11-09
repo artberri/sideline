@@ -61,15 +61,44 @@ export function hiddenLabel({ above, below }: { above: number; below: number }):
 	return [above > 0 ? `↑ ${above}` : '', below > 0 ? `↓ ${below}` : ''].filter(Boolean).join(' ')
 }
 
-// A command's text as rows `columns` wide, each line wrapped at the width, so one row is one line of the window; the
-// first line after `$ `.
-export function wrapLines(command: string, columns: number): string[] {
+// Text as rows `columns` wide, each line wrapped at the width, so one row is one line of the window; a blank line
+// is one row.
+function wrapText(text: string, columns: number): string[] {
 	const width = Math.max(1, columns)
-	return command.split('\n').flatMap((line, index) => {
-		const text = index === 0 ? `$ ${line}` : line
-		if (text === '') return [' ']
+	return text.split('\n').flatMap((line) => {
+		if (line === '') return [' ']
 		const rows: string[] = []
-		for (let at = 0; at < text.length; at += width) rows.push(text.slice(at, at + width))
+		for (let at = 0; at < line.length; at += width) rows.push(line.slice(at, at + width))
 		return rows
 	})
+}
+
+// A command's text as rows `columns` wide, the first line after `$ `.
+export function wrapLines(command: string, columns: number): string[] {
+	return wrapText(`$ ${command}`, columns)
+}
+
+// What a row of an opened command is: the command, its stdout, its stderr (or a failure's error text), the line that
+// says it is still running, or a note (a blank row, no output).
+export type CommandRowTone = 'command' | 'stdout' | 'stderr' | 'running' | 'note'
+
+export type CommandRow = { text: string; tone: CommandRowTone }
+
+// An opened command's rows: the command, a blank row, then what it printed, stdout before stderr; a note while it runs
+// or when it printed nothing. A command logged before sideline kept output shows the command alone.
+export function commandRows(
+	command: string,
+	state: 'running' | 'done' | 'failed',
+	output: { stdout: string; stderr: string } | undefined,
+	columns: number,
+): CommandRow[] {
+	const rows = (text: string, tone: CommandRowTone) => wrapText(text, columns).map((row) => ({ text: row, tone }))
+	const head = rows(`$ ${command}`, 'command')
+	if (state === 'running') return [...head, { text: ' ', tone: 'note' }, ...rows('running…', 'running')]
+	if (!output) return head
+	const printed = [
+		...(output.stdout === '' ? [] : rows(output.stdout, 'stdout')),
+		...(output.stderr === '' ? [] : rows(output.stderr, 'stderr')),
+	]
+	return [...head, { text: ' ', tone: 'note' }, ...(printed.length > 0 ? printed : rows('no output', 'note'))]
 }

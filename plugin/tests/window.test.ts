@@ -1,9 +1,10 @@
 import { expect, test } from 'claude-code/testing'
 
-import { commandStep } from '../hooks/commands'
+import { OUTPUT_LINES, cleanOutput, commandOutput, commandStep } from '../hooks/commands'
 import {
 	changesRows,
 	clampOffset,
+	commandRows,
 	hiddenAround,
 	hiddenLabel,
 	isOverCommands,
@@ -71,4 +72,43 @@ test('commandStep moves j/k through the log, stopping at the ends; l opens and h
 	expect(commandStep(ids, 'one', 'up')).toBeNull()
 	expect(commandStep(ids, 'two', 'open')).toEqual({ kind: 'open' })
 	expect(commandStep(ids, 'two', 'leave')).toEqual({ kind: 'leave' })
+})
+
+test('cleanOutput drops escapes, overwritten text, tabs and trailing blank lines', () => {
+	expect(cleanOutput('\x1b[32mok\x1b[0m\r\n10%\r50%\r100%\na\tb\n\n')).toBe('ok\n100%\na  b')
+})
+
+test('cleanOutput keeps the first lines and counts the rest', () => {
+	const text = Array.from({ length: OUTPUT_LINES + 3 }, (_, n) => `line ${n}`).join('\n')
+	const lines = cleanOutput(text).split('\n')
+	expect(lines).toHaveLength(OUTPUT_LINES + 1)
+	expect(lines.at(-1)).toBe('… 3 more lines')
+})
+
+test('commandOutput reads the streams, a failure as the error text, nothing for a refusal', () => {
+	expect(commandOutput({ result: { stdout: 'hi\n', stderr: '', interrupted: false } })).toEqual({
+		stdout: 'hi',
+		stderr: '',
+	})
+	expect(commandOutput({ isError: true, result: 'Exit code 1\nnope' })).toEqual({
+		stdout: '',
+		stderr: 'Exit code 1\nnope',
+	})
+	expect(commandOutput({ deny: 'no' })).toBeUndefined()
+	expect(commandOutput(null)).toBeUndefined()
+})
+
+const tones = (rows: { tone: string }[]) => rows.map((row) => row.tone)
+
+test('commandRows puts the output under the command, with a note while it runs or when it printed nothing', () => {
+	expect(tones(commandRows('ls', 'done', { stdout: 'a\nb', stderr: 'c' }, 20))).toEqual([
+		'command',
+		'note',
+		'stdout',
+		'stdout',
+		'stderr',
+	])
+	expect(commandRows('ls', 'running', undefined, 20).at(-1)?.text).toBe('running…')
+	expect(commandRows('ls', 'done', { stdout: '', stderr: '' }, 20).at(-1)?.text).toBe('no output')
+	expect(commandRows('ls', 'done', undefined, 20)).toEqual([{ text: '$ ls', tone: 'command' }])
 })

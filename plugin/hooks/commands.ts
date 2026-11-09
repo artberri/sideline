@@ -1,3 +1,5 @@
+import type { CommandOutput } from '../types'
+
 // A command longer than this, or on more than one line, is hidden behind its description.
 export const LONG_COMMAND = 80
 
@@ -66,4 +68,42 @@ export function commandStep(
 	if (move === null) return null
 	const target = ids[ids.indexOf(current) + (move === 'down' ? 1 : -1)]
 	return target === undefined ? null : { kind: 'focus', id: target }
+}
+
+// A logged command keeps this many lines of each stream; the rest is counted in a last line.
+export const OUTPUT_LINES = 200
+
+// ANSI escape sequences (colors, cursor moves) and a carriage return's overwritten text: the pane draws plain text.
+// oxlint-disable-next-line no-control-regex -- the escapes are what it matches
+const ESCAPES = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-_]/g
+
+// A stream as the pane draws it: escapes gone, each line only what is left after its last carriage return, tabs as
+// spaces, no trailing blank lines, and past `OUTPUT_LINES` lines a count of the rest.
+export function cleanOutput(text: string): string {
+	const lines = text
+		.replace(ESCAPES, '')
+		.replace(/\r\n/g, '\n')
+		.split('\n')
+		.map((line) => (line.split('\r').findLast((part) => part !== '') ?? '').replace(/\t/g, '  ').trimEnd())
+	while (lines.length > 0 && lines.at(-1) === '') lines.pop()
+	if (lines.length <= OUTPUT_LINES) return lines.join('\n')
+	const rest = lines.length - OUTPUT_LINES
+	return [...lines.slice(0, OUTPUT_LINES), `… ${rest} more line${rest === 1 ? '' : 's'}`].join('\n')
+}
+
+const stream = (value: unknown) => (typeof value === 'string' ? cleanOutput(value) : '')
+
+type BashResult = { result?: unknown; text?: string; isError?: boolean; deny?: unknown }
+
+// What an ended Bash call printed: its stdout and stderr, or for an error the text the model read (the output and its
+// exit code); `undefined` for a refusal or a call that threw.
+export function commandOutput(result: BashResult | null): CommandOutput | undefined {
+	if (result === null || result.deny !== undefined) return undefined
+	if (result.isError) {
+		const text = typeof result.result === 'string' ? result.result : (result.text ?? '')
+		return { stdout: '', stderr: cleanOutput(text) }
+	}
+	const record = result.result
+	if (!isRecord(record)) return { stdout: '', stderr: '' }
+	return { stdout: stream(record.stdout), stderr: stream(record.stderr) }
 }

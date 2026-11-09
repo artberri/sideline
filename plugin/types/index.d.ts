@@ -46,8 +46,17 @@ export type ActiveEdit = { id: string; path: string; state: 'running' | 'done'; 
 export type FileDiff = { path: string; hunks: string }
 
 // A Bash command in the pane's log of the last few, by its tool_use_id: still running, finished, or failed (an error,
-// a refusal or an interruption).
-export type LoggedCommand = { id: string; command: string; state: 'running' | 'done' | 'failed' }
+// a refusal or an interruption), with what it printed once it ended (absent while it runs, and on a refusal).
+export type LoggedCommand = {
+	id: string
+	command: string
+	state: 'running' | 'done' | 'failed'
+	output?: CommandOutput
+}
+
+// What a logged command printed, each stream cleaned for the pane and cut to its first lines: a failed command's
+// error text, the output and exit code as the model read it, is its `stderr`.
+export type CommandOutput = { stdout: string; stderr: string }
 
 // What Claude is doing, as the pane's title shows it: working through a turn, waiting on the person's answer to a
 // question or a plan, or waiting for a prompt.

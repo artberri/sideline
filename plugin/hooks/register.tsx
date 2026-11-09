@@ -15,7 +15,7 @@ import type {
 	Snapshot,
 	TurnState,
 } from '../types'
-import { LOG_SIZE, commandStep, hiddenCommandInput, logLine, runningDescription } from './commands'
+import { LOG_SIZE, commandOutput, commandStep, hiddenCommandInput, logLine, runningDescription } from './commands'
 import { readCommitDiff, readCommitFiles, readDiff, readSnapshot } from './git'
 import type { Git } from './git'
 import { USAGE_LABEL, USAGE_SEPARATOR, bar, barWidth, level, modelName, percentLabel, readings } from './meter'
@@ -38,14 +38,15 @@ import {
 	SESSION_ROWS,
 	changesRows,
 	clampOffset,
+	commandRows as viewRows,
 	commandRowsOption,
 	commandsBoxRows,
 	hiddenAround,
 	hiddenLabel,
 	isOverCommands,
 	revealOffset,
-	wrapLines,
 } from './window'
+import type { CommandRowTone } from './window'
 import type { TreeRow } from './tree'
 
 const PANE = 'sideline'
@@ -56,6 +57,14 @@ const SESSION_COLOR = 'yellow'
 const COMMAND_COLOR = 'inactive'
 // Each log line starts with its command's state.
 const LOG_GLYPH: Record<LoggedCommand['state'], string> = { running: '●', done: '✓', failed: '✗' }
+// An opened command's rows: the command in the text color, stdout subtle, stderr (and a failure's text) as an error.
+const OUTPUT_COLOR: Record<CommandRowTone, Color | undefined> = {
+	command: undefined,
+	stdout: 'subtle',
+	stderr: 'error',
+	running: undefined,
+	note: undefined,
+}
 const LOG_GLYPH_COLOR: Record<LoggedCommand['state'], Color> = { running: 'claude', done: 'success', failed: 'error' }
 // What a titled box takes from the width inside the pane: its border and its padding, each side.
 const BOX_FRAME = 4
@@ -549,7 +558,10 @@ async function noteCallEnd(
 		const isInterrupted =
 			typeof output === 'object' && output !== null && 'interrupted' in output && output.interrupted === true
 		const state: LoggedCommand['state'] = isFailed || isInterrupted ? 'failed' : 'done'
-		await update($, commands, (list) => list.map((one) => (one.id === call.tool_use_id ? { ...one, state } : one)))
+		const printed = commandOutput(result)
+		await update($, commands, (list) =>
+			list.map((one) => (one.id === call.tool_use_id ? { ...one, state, output: printed } : one)),
+		)
 	}
 	if (result && call.tool === 'Bash' && !isFailed) {
 		const startedAt = await $.clock.now()
@@ -1053,7 +1065,10 @@ export const register: Register = (on, options) => {
 		const filesLabel = `${fileCount} file${fileCount === 1 ? '' : 's'}`
 		const windowRows = changesRows(e.props.scroll.bodyRows, true, isShowingSession, commandsBox)
 		const innerColumns = e.props.bodyColumns - BOX_FRAME
-		const commandRows = commandView ? wrapLines(commandView.command, innerColumns) : []
+		const hasClient = HAS_CLIENT.has(e.surface) && 'Client' in elements
+		const commandRows = commandView
+			? viewRows(commandView.command, commandView.state, commandView.output, innerColumns)
+			: []
 		const diffLines = diffView && diffView.hunks !== '' ? diffView.hunks.replace(/\n$/, '').split('\n') : []
 		// A diff or a command keeps its header row and the blank row under it above the window.
 		// An opened commit keeps its header row, and a blank row under it, above everything else in the box.
@@ -1111,9 +1126,23 @@ export const register: Register = (on, options) => {
 										onPress={() => void toggleCommand($, commandView.id)}
 									/>
 									<Box flexDirection="column" marginTop={1}>
-										{commandRows.slice(offset, offset + shownRows).map((line, index) => (
-											<Text key={`command-line-${offset + index}`}>{line}</Text>
-										))}
+										{commandRows.slice(offset, offset + shownRows).map((line, index) =>
+											line.tone === 'running' && hasClient ? (
+												<elements.Client
+													key={`command-line-${offset + index}`}
+													module="./running.tsx"
+													props={{ text: line.text }}
+												/>
+											) : (
+												<Text
+													key={`command-line-${offset + index}`}
+													color={OUTPUT_COLOR[line.tone]}
+													dimColor={line.tone === 'note' || line.tone === 'running'}
+												>
+													{line.text}
+												</Text>
+											),
+										)}
 									</Box>
 								</Box>
 							) : commit && rows.length === 0 && !diffView ? (
@@ -1157,7 +1186,7 @@ export const register: Register = (on, options) => {
 										))}
 									</Box>
 								</Box>
-							) : HAS_CLIENT.has(e.surface) && 'Client' in elements ? (
+							) : hasClient ? (
 								<elements.Client
 									key="rows"
 									module="./rows.tsx"
